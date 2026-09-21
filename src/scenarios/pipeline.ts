@@ -34,14 +34,25 @@ import { Calibrator } from '../metacognition/calibration.ts';
 import { CognitiveAgent, type Environment } from '../cognition/agent.ts';
 import type { PlanState } from '../planning/planner.ts';
 import type { PerceptInput } from '../perception/gate.ts';
+import type { Rng } from '../kernel/rng.ts';
 
-/** A tiny world: a service that fails under load and can be fixed. */
+/** The scenario's world: a service that fails under load and can be fixed. */
 export interface PipelineWorld extends Environment {
   readonly log: string[];
   state: PlanState;
 }
 
-export function createPipelineWorld(): PipelineWorld {
+/**
+ * Build it.
+ *
+ * `rng` is injected rather than ambient for the same reason the kernel does it:
+ * the environment's behaviour must be reproducible from the seed, or a run of
+ * the scenario cannot be compared with another run of the scenario. Without it
+ * the seed would reach the scheduler but nothing observable would depend on it,
+ * and "the same seed replays the same trajectory" would be true only because
+ * *nothing* varied — which is a much weaker claim than it looks.
+ */
+export function createPipelineWorld(rng: Rng): PipelineWorld {
   const state: Record<string, unknown> = {
     load: 40,
     cacheWarm: false,
@@ -64,10 +75,19 @@ export function createPipelineWorld(): PipelineWorld {
         case 'raise the connection pool':
           state['connectionPoolSize'] = 50;
           return { name, succeeded: true, detail: 'the pool is larger' };
-        case 'restart the service':
-          state['serviceHealthy'] = true;
-          state['incidentOpen'] = false;
-          return { name, succeeded: true, detail: 'the service restarted' };
+        case 'restart the service': {
+          // A restart is not guaranteed to take on the first attempt — which is
+          // the sort of thing that makes a real remediation plan a plan rather
+          // than a script. The 80% figure is the injected randomness that makes
+          // the seed observable.
+          const worked = rng.bool(0.8);
+          if (worked) {
+            state['serviceHealthy'] = true;
+            state['incidentOpen'] = false;
+            return { name, succeeded: true, detail: 'the service restarted' };
+          }
+          return { name, succeeded: false, detail: 'the restart did not take; the process is still wedged' };
+        }
         case 'declare an incident':
           state['incidentOpen'] = true;
           return { name, succeeded: true, detail: 'an incident is open' };
@@ -162,6 +182,18 @@ export async function runPipelineScenario(options: { readonly seed?: number; rea
   const calibrator = new Calibrator({ clock: kernel.clock, bus: kernel.bus, minimumSamples: 8 });
 
   // ── the agent's knowledge of how to fix things ──
+  /**
+   * Measurement noise, drawn from the seeded generator.
+   *
+   * The world is otherwise fully deterministic, which would make the seed
+   * unobservable — and a scenario where nothing varies would make "the same
+   * seed replays the same trajectory" true for the wrong reason. A monitored
+   * service has jitter in its readings; modelling that is both more honest and
+   * what makes the determinism claim testable in both directions, since CI
+   * checks that different seeds diverge as well as that one seed repeats.
+   */
+  const jitter = (base: number, spread: number): number => Math.round(base + kernel.rng.range(-spread, spread));
+
   planner.defineAction({
     name: 'warm the cache',
     preconditions: [{ key: 'cacheWarm', absent: true }],
@@ -193,7 +225,7 @@ export async function runPipelineScenario(options: { readonly seed?: number; rea
     actions: ['restart the service'],
   });
 
-  const world = createPipelineWorld();
+  const world = createPipelineWorld(kernel.rng);
   const agent = new CognitiveAgent({
     kernel,
     working,
@@ -238,8 +270,8 @@ export async function runPipelineScenario(options: { readonly seed?: number; rea
   const calmPercepts = (i: number): PerceptInput[] => {
     const latencies = [180, 184, 188, 192];
     const loads = [40, 42, 44, 41];
-    const latency = latencies[i % latencies.length] as number;
-    const load = loads[i % loads.length] as number;
+    const latency = jitter(latencies[i % latencies.length] as number, 3);
+    const load = jitter(loads[i % loads.length] as number, 2);
     return [
       { content: 'the service is healthy', source: 'monitor', modality: 'event', intensity: 0.35 },
       { content: 'request latency is nominal', source: 'monitor', modality: 'numeric', intensity: 0.3, data: { latency } },
@@ -249,7 +281,7 @@ export async function runPipelineScenario(options: { readonly seed?: number; rea
 
   const incidentPercepts = (i: number): PerceptInput[] => {
     const errorRates = [5, 7, 9];
-    const errorRate = errorRates[i % errorRates.length] as number;
+    const errorRate = jitter(errorRates[i % errorRates.length] as number, 1);
     return [
       { content: 'the service is healthy', source: 'monitor', modality: 'event', intensity: 0.35 },
       {
@@ -257,7 +289,7 @@ export async function runPipelineScenario(options: { readonly seed?: number; rea
         source: 'monitor',
         modality: 'numeric',
         intensity: 0.85,
-        data: { latency: 900 },
+        data: { latency: jitter(900, 40) },
       },
       {
         content: 'the payment gateway timed out under load',
@@ -279,7 +311,7 @@ export async function runPipelineScenario(options: { readonly seed?: number; rea
 
   const repairPercepts = (i: number): PerceptInput[] => {
     const latencies = [300, 240, 180, 120];
-    const latency = latencies[i % latencies.length] as number;
+    const latency = jitter(latencies[i % latencies.length] as number, 8);
     return [
       { content: 'the cache is warm', source: 'monitor', modality: 'event', intensity: 0.5 },
       { content: 'request latency is recovering', source: 'monitor', modality: 'numeric', intensity: 0.6, data: { latency } },

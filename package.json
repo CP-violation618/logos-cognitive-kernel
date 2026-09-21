@@ -42,11 +42,13 @@
     "demo": "node src/cli.ts demo",
     "repl": "node src/cli.ts repl",
     "cli": "node src/cli.ts",
+    "inspect": "node src/cli.ts inspect",
+    "bench": "node src/cli.ts bench",
+    "example": "node examples/quickstart.ts",
     "test": "node --test \"test/**/*.test.ts\"",
     "test:watch": "node --test --watch \"test/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
-    "bench": "node src/cli.ts bench",
-    "verify": "npm run typecheck && npm test"
+    "verify": "npm run typecheck && npm test && npm run example"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

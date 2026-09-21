@@ -1,0 +1,164 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Cancel superseded runs on the same ref. A queue of stale builds on a branch
+# nobody is looking at any more is just noise.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test on Node ${{ matrix.node }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # 22.6 is the floor: it is the first release with native TypeScript type
+        # stripping, which this project depends on to run .ts files directly.
+        node: ['22.6', '22.x', '24.x']
+        os: [ubuntu-latest]
+        include:
+          # One Windows and one macOS run, to catch path and line-ending bugs
+          # without multiplying the whole matrix.
+          - node: '24.x'
+            os: windows-latest
+          - node: '24.x'
+            os: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Report environment
+        run: |
+          node --version
+          npm --version
+
+      # `--include=dev` regardless of local npm configuration: a machine with
+      # `omit=dev` set globally would otherwise install nothing and silently
+      # skip the type check.
+      - name: Install dev dependencies
+        run: npm install --include=dev
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      # No build step and no transpilation: Node runs the TypeScript directly.
+      # If this fails, the floor version claim in the README is wrong.
+      - name: Run tests
+        run: npm test
+
+  determinism:
+    name: Determinism
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          cache: npm
+
+      - name: Install dev dependencies
+        run: npm install --include=dev
+
+      # The architecture claims that the same seed replays the same mental
+      # trajectory. That claim is either checkable in CI or it is marketing.
+      - name: The demo must be reproducible
+        shell: bash
+        run: |
+          node src/cli.ts demo --seed 1234 --quiet > /tmp/run-a.txt
+          node src/cli.ts demo --seed 1234 --quiet > /tmp/run-b.txt
+          if ! diff -q /tmp/run-a.txt /tmp/run-b.txt > /dev/null; then
+            echo "::error::the same seed produced a different trajectory"
+            diff /tmp/run-a.txt /tmp/run-b.txt || true
+            exit 1
+          fi
+          echo "same seed, identical trajectory"
+
+      - name: Different seeds must diverge
+        shell: bash
+        run: |
+          node src/cli.ts demo --seed 1234 --quiet > /tmp/seed-a.txt
+          node src/cli.ts demo --seed 9876 --quiet > /tmp/seed-b.txt
+          if diff -q /tmp/seed-a.txt /tmp/seed-b.txt > /dev/null; then
+            echo "::error::two different seeds produced identical output — the seed is not reaching the RNG"
+            exit 1
+          fi
+          echo "different seeds, different trajectories"
+
+  example:
+    name: Examples run
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+
+      # The examples are documentation that cannot rot, but only if something
+      # checks that they still run.
+      - name: Run the quickstart
+        run: node examples/quickstart.ts
+
+      - name: CLI responds to every documented command
+        run: |
+          node src/cli.ts help > /dev/null
+          node src/cli.ts inspect > /dev/null
+          node src/cli.ts inspect --json | node -e "JSON.parse(require('fs').readFileSync(0,'utf8'))"
+          node src/cli.ts bench --cycles 50 > /dev/null
+          echo "all commands responded"
+
+  zero-dependencies:
+    name: Zero runtime dependencies
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The badge on the README makes a claim. This job enforces it, because a
+      # claim that nothing checks is a claim that will quietly stop being true.
+      - name: Assert package.json declares no runtime dependencies
+        shell: bash
+        run: |
+          node -e '
+            const pkg = require("./package.json");
+            const runtime = Object.keys(pkg.dependencies ?? {});
+            if (runtime.length > 0) {
+              console.error("::error::runtime dependencies were added: " + runtime.join(", "));
+              process.exit(1);
+            }
+            const dev = Object.keys(pkg.devDependencies ?? {});
+            console.log("runtime: 0 dependencies");
+            console.log("dev:     " + dev.length + " (" + dev.join(", ") + ")");
+          '
+
+      - name: Assert no import resolves outside node: and ./
+        shell: bash
+        run: |
+          # Every import in src/ must be a relative path or a node: builtin.
+          # An accidental bare specifier would be a dependency the badge lies about.
+          if grep -rEn "from ['\"][^./]" src --include='*.ts' | grep -v "from 'node:"; then
+            echo "::error::a non-relative, non-builtin import was found in src/"
+            exit 1
+          fi
+          echo "every src/ import is relative or a node: builtin"

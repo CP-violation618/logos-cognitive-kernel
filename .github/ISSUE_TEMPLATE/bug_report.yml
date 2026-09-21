@@ -1,0 +1,100 @@
+name: Bug report
+description: Something behaves differently from how it is documented
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting. Because this architecture is **deterministic**,
+        a good bug report here can become a test case rather than a description
+        — so the seed and the exact sequence matter more than usual.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: The output of `git rev-parse --short HEAD`, or a release tag.
+      placeholder: '0.1.0 or a1b2c3d'
+    validations:
+      required: true
+
+  - type: input
+    id: node
+    attributes:
+      label: Node version
+      description: The output of `node --version`. The floor is 22.6.
+      placeholder: 'v24.16.0'
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: |
+        If a doc comment, README section or test states the behaviour, quote it.
+        A discrepancy between a documented claim and the code is the most
+        useful kind of bug this project can receive, because the claim is
+        supposed to be the specification.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What actually happened
+      description: Paste the output. If a number is wrong, say what number you expected and why.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: |
+        A CLI invocation with a seed (`node src/cli.ts demo --seed 1234`) is
+        ideal. A failing test is even better.
+      render: shell
+      placeholder: |
+        node src/cli.ts demo --seed 1234
+    validations:
+      required: true
+
+  - type: input
+    id: seed
+    attributes:
+      label: Seed
+      description: If the behaviour depends on the random stream, the seed pins it down.
+      placeholder: '0x5eed'
+
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Which layer
+      description: If you can tell. A guess is fine — a wrong guess is still information.
+      options:
+        - Unsure
+        - Kernel (clock, bus, scheduler, rng, config)
+        - Memory (working, episodic, semantic, consolidation, recall)
+        - Perception (attentional gate)
+        - Reasoning (world model, beliefs)
+        - Planning (goals, planner)
+        - Metacognition (calibration)
+        - Cognition (the integrated cycle)
+        - CLI or examples
+        - Documentation
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I ran `npm run verify` and it passed on a clean checkout
+          required: false
+        - label: I searched existing issues for the same behaviour
+          required: true
+        - label: This is not a request for an LLM adapter or a model-backed feature
+          required: false

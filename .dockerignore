@@ -1,0 +1,43 @@
+# Build context exclusions.
+#
+# node_modules is excluded because the image installs its own; copying a host
+# tree in would bring platform-specific binaries and defeat the layer cache.
+# The runtime state directory is excluded because an agent's memories are not
+# source code.
+
+node_modules
+npm-debug.log*
+.git
+.gitignore
+.gitattributes
+.github
+
+# Runtime state — a mind's memories do not belong in a source image.
+.logos
+data
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.db
+
+# Editor and OS noise.
+.vscode
+.idea
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Build and test artifacts.
+dist
+build
+coverage
+*.tsbuildinfo
+tmp
+temp
+*.log
+
+# Local environment.
+.env
+.env.*
+!.env.example

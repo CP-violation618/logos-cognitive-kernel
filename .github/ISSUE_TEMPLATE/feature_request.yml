@@ -1,0 +1,82 @@
+name: Feature request
+description: Propose a capability, or argue with a design decision
+labels: ['enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This project has opinions, and they are stated plainly so that a
+        proposal can disagree with them deliberately. The two that rule out the
+        most suggestions:
+
+        **Zero runtime dependencies.** Not a preference — the architecture is
+        auditable in an afternoon *because* there is nothing to audit but the
+        source. Dev dependencies are a different matter; there are two, and both
+        are for checking rather than running.
+
+        **Every claim must be checkable.** If a feature describes behaviour that
+        nothing could verify, it belongs in a discussion before it belongs in
+        the code.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: |
+        Describe the situation, not the solution. What can the architecture not
+        currently do, or do badly? A concrete scenario is worth more than an
+        abstraction.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you propose
+      description: If it maps onto a layer, say which. If it needs a new layer, say why it cannot live in an existing one.
+    validations:
+      required: true
+
+  - type: textarea
+    id: checkable
+    attributes:
+      label: How would this be checked?
+      description: |
+        What test would fail if this stopped working? What number would the test
+        assert on? This repository's tests are its argument, so a proposal that
+        cannot be measured needs a good reason.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What else did you consider?
+      description: Including doing nothing. A proposal is stronger when the alternatives are named.
+
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Which layer
+      options:
+        - Kernel
+        - Memory
+        - Perception
+        - Reasoning
+        - Planning
+        - Metacognition
+        - Cognition (the integrated cycle)
+        - New layer
+        - Tooling, CLI or documentation
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: This does not require a runtime dependency
+          required: true
+        - label: I read CONTRIBUTING.md
+          required: false

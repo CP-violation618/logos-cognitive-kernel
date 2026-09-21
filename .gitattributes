@@ -1,0 +1,32 @@
+# Normalise line endings so the repository has one canonical form regardless
+# of which platform a contributor clones on. Without this, a Windows checkout
+# rewrites every file it touches and the diff noise buries real changes.
+
+* text=auto eol=lf
+
+# Explicitly binary — never line-ending converted.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.zip binary
+*.gz binary
+
+# SQLite databases are binary and are also gitignored; belt and braces.
+*.sqlite binary
+*.db binary
+
+# Keep Windows-only scripts on CRLF so they stay runnable.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Generated files that should never appear in a diff.
+package-lock.json -diff linguist-generated

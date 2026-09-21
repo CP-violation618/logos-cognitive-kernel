@@ -1,0 +1,63 @@
+{
+  "name": "logos-cognitive-kernel",
+  "version": "0.1.0",
+  "description": "LOGOS — a zero-dependency cognitive kernel for AGI research. Layered memory, goal-driven autonomy, metacognitive reflection, and predictive world modelling in pure TypeScript.",
+  "keywords": [
+    "agi",
+    "cognitive-architecture",
+    "cognitive-kernel",
+    "artificial-general-intelligence",
+    "agent",
+    "autonomous-agents",
+    "metacognition",
+    "world-model",
+    "memory",
+    "typescript"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.6.0"
+  },
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./kernel": "./src/kernel/index.ts",
+    "./memory": "./src/memory/index.ts",
+    "./reasoning": "./src/reasoning/index.ts",
+    "./planning": "./src/planning/index.ts",
+    "./metacognition": "./src/metacognition/index.ts"
+  },
+  "files": [
+    "src",
+    "docs",
+    "examples",
+    "README.md",
+    "LICENSE"
+  ],
+  "bin": {
+    "logos": "./src/cli.ts"
+  },
+  "scripts": {
+    "demo": "node src/cli.ts demo",
+    "repl": "node src/cli.ts repl",
+    "cli": "node src/cli.ts",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "test:watch": "node --test --watch \"test/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit",
+    "bench": "node src/cli.ts bench",
+    "verify": "npm run typecheck && npm test"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourname/logos-cognitive-kernel.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourname/logos-cognitive-kernel/issues"
+  },
+  "homepage": "https://github.com/yourname/logos-cognitive-kernel#readme"
+}

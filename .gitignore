@@ -1,0 +1,48 @@
+# ── Dependencies ──────────────────────────────────────────────────────────
+node_modules/
+.pnpm-store/
+
+# ── Build & test artifacts ────────────────────────────────────────────────
+dist/
+build/
+*.tsbuildinfo
+coverage/
+.nyc_output/
+
+# ── Runtime state ─────────────────────────────────────────────────────────
+# LOGOS persists its own mind here. An agent's memories are not source code.
+.logos/
+data/
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.db
+
+# ── Logs ──────────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+logs/
+
+# ── Environment ───────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Editors & OS ──────────────────────────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Temporaries ───────────────────────────────────────────────────────────
+tmp/
+temp/
+*.tmp
+*.bak

@@ -373,18 +373,26 @@ export class ConsolidationEngine {
    * Intersection, not frequency. A token appearing in most members but not all
    * describes the cluster's tendency rather than its identity, and using it
    * would produce a label that over-claims.
+   *
+   * Order is FIRST APPEARANCE in the representative episode, not frequency and
+   * certainly not alphabetical. Alphabetical ordering turns
+   * "the payment gateway timed out" into "gateway out payment timed", which is
+   * not a label a mind could use or a human could read — the shared tokens are
+   * a phrase, and a phrase depends on its word order.
    */
   #labelFor(cluster: EpisodeCluster): string {
     const shared = cluster.sharedTokens.filter((token) => token.length > 1);
     if (shared.length === 0) {
       // No strict invariant. Fall back to the most common tokens rather than
-      // refusing to generalise — but the resulting concept will be labelled
-      // from its members' overlap and is capped in length to stay readable.
-      const top = [...cluster.sharedTokens].slice(0, 3);
-      return top.join(' ').trim();
+      // refusing to generalise, still in first-appearance order.
+      return cluster.sharedTokens.slice(0, 3).join(' ').trim();
     }
+
+    const ordered = [...shared].sort(
+      (a, b) => firstAppearance(cluster, a) - firstAppearance(cluster, b),
+    );
     // Bounded so a label stays a label rather than becoming a sentence.
-    return shared.slice(0, 4).join(' ');
+    return ordered.slice(0, 5).join(' ');
   }
 
   #describeCluster(members: Episode[], counts: Map<string, number>): EpisodeCluster {
@@ -397,9 +405,10 @@ export class ConsolidationEngine {
       else if (count === 1) distinguishing.push(token);
     }
 
-    // Stable order: shared tokens by descending frequency then alphabetically,
-    // so the same cluster always yields the same label.
-    shared.sort((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0) || a.localeCompare(b));
+    // Deterministic ordering. Deliberately NOT sorted by frequency or
+    // alphabetically: `#labelFor` imposes first-appearance order so that a
+    // label reads as the phrase the experience actually used.
+    shared.sort((a, b) => a.localeCompare(b));
 
     let total = 0;
     let pairs = 0;
@@ -519,6 +528,26 @@ const clampUnit = (value: number): number => {
 };
 
 const round = (n: number): number => Math.round(n * 1e6) / 1e6;
+
+/**
+ * Where a token first occurs in the cluster's episodes, used to keep a label's
+ * word order faithful to how the experience was actually described.
+ *
+ * The representative episode is preferred; failing that, whichever member
+ * mentions the token soonest.
+ */
+function firstAppearance(cluster: EpisodeCluster, token: string): number {
+  const representative = cluster.episodes[0];
+  if (representative !== undefined) {
+    const index = representative.tokens.indexOf(token);
+    if (index >= 0) return index;
+  }
+  for (const episode of cluster.episodes) {
+    const index = episode.tokens.indexOf(token);
+    if (index >= 0) return 1000 + index;
+  }
+  return Number.MAX_SAFE_INTEGER;
+}
 
 /** Exported for tests and tooling that want to inspect tokenisation directly. */
 export { tokenize as tokenizeForClustering, embed as embedForClustering };

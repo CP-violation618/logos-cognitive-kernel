@@ -112,6 +112,15 @@ export interface ConceptObservation {
   readonly properties?: Readonly<Record<string, unknown>>;
   /** Id of the episode this came from. Drives grounding. */
   readonly sourceEpisode?: string;
+  /**
+   * Ids of several episodes that jointly support this observation.
+   *
+   * Consolidation produces concepts from CLUSTERS of episodes, and each member
+   * is independent evidence. Passing them as one concatenated string would
+   * make the store count a whole cluster as a single source, which is exactly
+   * the overconfidence the grounding rule exists to prevent.
+   */
+  readonly sourceEpisodes?: readonly string[];
   /** Caller's confidence in this particular observation. */
   readonly confidence?: number;
   /** Situational context, used to detect when a concept is context-bound. */
@@ -310,7 +319,7 @@ export class SemanticMemory {
     // ── genuinely new concept ──
     this.#seq += 1;
     const id = `con${this.#seq}` as ConceptId;
-    const grounding = observation.sourceEpisode === undefined ? 0 : 1;
+    const sources = sourcesOf(observation);
     const record: ConceptRecord = {
       id,
       label,
@@ -324,10 +333,10 @@ export class SemanticMemory {
       // caller's, and let grounding promote it.
       confidence: clampCredence((observation.confidence ?? 0.7) * 0.6),
       strength: 0.55,
-      grounding,
-      contributedEpisodes: new Set(observation.sourceEpisode === undefined ? [] : [observation.sourceEpisode]),
+      grounding: sources.length,
+      contributedEpisodes: new Set(sources),
       // Durability is derived from grounding and kept in sync on every merge.
-      entrenchment: entrenchmentFor(grounding),
+      entrenchment: entrenchmentFor(sources.length),
       halfLife: this.#baseHalfLife,
       encodedAt: this.#asTick(),
       lastAccessAt: this.#asTick(),
@@ -686,17 +695,18 @@ export class SemanticMemory {
     // Grounding counts DISTINCT episodes. Observing the same source again
     // strengthens the concept's activation but is not new evidence, and must
     // not raise confidence or entrenchment.
-    let novelEvidence = false;
-    if (observation.sourceEpisode !== undefined && !record.contributedEpisodes.has(observation.sourceEpisode)) {
-      record.contributedEpisodes.add(observation.sourceEpisode);
-      record.grounding += 1;
-      novelEvidence = true;
+    let novelSources = 0;
+    for (const source of sourcesOf(observation)) {
+      if (record.contributedEpisodes.has(source)) continue;
+      record.contributedEpisodes.add(source);
+      novelSources += 1;
     }
+    record.grounding += novelSources;
 
-    if (novelEvidence) {
+    if (novelSources > 0) {
       const target = clampCredence(observation.confidence ?? 0.7);
       record.confidence = clampCredence(record.confidence + (target - record.confidence) / (1 + record.grounding));
-      record.strength = clampUnit(record.strength + 0.1 / Math.sqrt(1 + record.grounding));
+      record.strength = clampUnit(record.strength + (0.1 * novelSources) / Math.sqrt(1 + record.grounding));
       // Durability follows grounding, derived rather than incremented so it
       // can never drift out of sync with the count it is supposed to reflect.
       record.entrenchment = entrenchmentFor(record.grounding);
@@ -849,6 +859,12 @@ function isContested(belief: PropertyBelief): boolean {
  */
 function entrenchmentFor(grounding: number): number {
   return 1 + 0.5 * Math.log1p(Math.max(0, grounding));
+}
+
+/** Flatten both source fields into one de-duplicated list of episode ids. */
+function sourcesOf(observation: ConceptObservation): string[] {
+  const all = [...(observation.sourceEpisode === undefined ? [] : [observation.sourceEpisode]), ...(observation.sourceEpisodes ?? [])];
+  return [...new Set(all)];
 }
 
 function hasProperties(

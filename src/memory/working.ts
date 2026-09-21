@@ -360,6 +360,52 @@ export class WorkingMemory {
     return Object.freeze({ reinforced: false, id: slot.id, evicted, admitted: true });
   }
 
+  /**
+   * Would `encode` admit this, and would it create a new slot?
+   *
+   * Read-only: nothing is stored, nothing is rehearsed, no counter moves. It
+   * exists so a caller can ask memory's opinion BEFORE committing to an
+   * encode, because encoding and then discovering the item was refused means
+   * either leaving junk in the structure or unwinding it.
+   *
+   * Used by the perceptual gate, which must distinguish "I chose not to admit
+   * this" from "memory had no room" — two different problems that need two
+   * different responses.
+   */
+  probe(
+    content: string,
+    options: { readonly salience?: number; readonly confidence?: number; readonly affect?: Affect; readonly kind?: MemoryKind } = {},
+  ): { readonly admitted: boolean; readonly wouldReinforce: boolean; readonly activation: number } {
+    if (typeof content !== 'string' || content.trim().length === 0) {
+      return { admitted: false, wouldReinforce: false, activation: 0 };
+    }
+
+    const kind = options.kind ?? 'working';
+    const confidence = clampCredence(options.confidence ?? 0.7);
+    const affect = options.affect ?? NEUTRAL_AFFECT;
+    const stated = clampUnit(options.salience ?? 0.5);
+    const intrinsic = clampUnit(0.5 * affectMagnitude(affect) + 0.5 * confidence);
+    const salience = clampUnit(0.55 * stated + 0.45 * intrinsic);
+    const initial = clampUnit(sigmoid((salience - this.#admitThreshold) * this.#salienceGain));
+
+    if (salience < this.#admitThreshold || initial < FLOOR) {
+      return { admitted: false, wouldReinforce: false, activation: initial };
+    }
+
+    const existing = this.#mostSimilar(embed(content), tokenize(content));
+    if (existing !== undefined && existing.score >= this.#dedupeThreshold) {
+      return { admitted: true, wouldReinforce: true, activation: initial };
+    }
+    if (this.#slots.length < this.#capacity) {
+      return { admitted: true, wouldReinforce: false, activation: initial };
+    }
+
+    const weakest = [...this.#slots].sort(byActivation)[0];
+    const displaces = weakest !== undefined && initial > weakest.activation;
+    void kind;
+    return { admitted: displaces, wouldReinforce: false, activation: initial };
+  }
+
   /** Retrieve a slot by id, reinforcing it (the retrieval-practice effect). */
   get(id: string, options: { readonly reinforce?: boolean } = {}): Slot | undefined {
     const slot = this.#slots.find((s) => s.id === id);

@@ -829,7 +829,14 @@ export class SemanticMemory {
       categories: Object.freeze([...record.categories]),
       properties: Object.freeze(properties),
       grounding: record.grounding,
-      data: Object.freeze({ edges: this.#edges.size }),
+      // Provenance is exposed so a higher layer can walk from a concept back to
+      // the specific experiences that produced it. Without this a mind could
+      // hold a generalisation and be unable to say what it was based on, which
+      // would make the reasoning unauditable.
+      data: Object.freeze({
+        sources: Object.freeze([...record.contributedEpisodes]),
+        edges: this.#edges.size,
+      }),
     });
   }
 

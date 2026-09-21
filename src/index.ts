@@ -54,6 +54,12 @@ export * from './reasoning/index.ts';
 // ── Layer 4: planning ───────────────────────────────────────────────────────
 export * from './planning/index.ts';
 
+// ── Layer 5: metacognition ──────────────────────────────────────────────────
+export * from './metacognition/index.ts';
+
+// ── The integrated cycle ────────────────────────────────────────────────────
+export * from './cognition/index.ts';
+
 /** Package version, mirrored from package.json for runtime introspection. */
 export const VERSION = '0.1.0';
 

@@ -55,9 +55,9 @@ export interface Observation {
 }
 
 /** A possible successor state, with how often it was seen. */
-export interface Prediction {
+export interface WorldPrediction {
   readonly content: string;
-  /** Probability mass, in [0,1]. Sums to 1 across a prediction set. */
+  /** Probability mass, in [0,1]. Sums to at most 1 across a prediction set. */
   readonly probability: number;
   /** Times this transition was observed. */
   readonly support: number;
@@ -72,7 +72,7 @@ export interface Expectation {
   /** How well the observation matched that state, in [0,1]. */
   readonly match: number;
   /** Ranked successors, most likely first. Empty for a terminal state. */
-  readonly successors: readonly Prediction[];
+  readonly successors: readonly WorldPrediction[];
   /** Observations of the matched state. Zero support means a first sighting. */
   readonly support: number;
   /** How predictable this state is: 1 = one outcome always, → 0 = uniform. */
@@ -401,12 +401,12 @@ export class WorldModel implements PredictionSource {
    * distribution over futures — enough for planning to reason about
    * consequences, and honest about being one path rather than all of them.
    */
-  predict(steps = 1): readonly Prediction[] {
+  predict(steps = 1): readonly WorldPrediction[] {
     if (!Number.isFinite(steps) || steps < 1) {
       throw new RangeError(`predict(steps) requires steps >= 1, received ${steps}`);
     }
 
-    const trajectory: Prediction[] = [];
+    const trajectory: WorldPrediction[] = [];
     let cursor = this.#lastStateKey;
     let confidence = 1;
 
@@ -555,7 +555,7 @@ export class WorldModel implements PredictionSource {
    * spuriously certain, because the rest of the architecture acts on
    * `determinism` and on `surprise`.
    */
-  #successorsOf(record: StateRecord, limit = 5): readonly Prediction[] {
+  #successorsOf(record: StateRecord, limit = 5): readonly WorldPrediction[] {
     const total = [...record.transitions.values()].reduce((a, b) => a + b, 0);
     if (total === 0) return [];
 
@@ -575,7 +575,7 @@ export class WorldModel implements PredictionSource {
             historicalSurprise: round(record.transitionSurprise.get(target) ?? 0),
           });
         })
-        .filter((p): p is Prediction => p !== undefined)
+        .filter((p): p is WorldPrediction => p !== undefined)
         .sort((a, b) => b.probability - a.probability || a.content.localeCompare(b.content))
         .slice(0, Math.max(1, limit)),
     );
@@ -658,7 +658,7 @@ export class WorldModel implements PredictionSource {
  * once report determinism 1.0 — certain about the future on the strength of a
  * single data point.
  */
-function determinismOf(successors: readonly Prediction[]): number {
+function determinismOf(successors: readonly WorldPrediction[]): number {
   if (successors.length === 0) return 0;
 
   const observed = successors.reduce((a, p) => a + p.probability, 0);

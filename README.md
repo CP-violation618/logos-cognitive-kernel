@@ -10,7 +10,7 @@ Layered memory · scarce attention · revisable belief · hierarchical planning 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.6-339933.svg)](https://nodejs.org)
 [![Dependencies](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](#zero-dependencies)
-[![Tests](https://img.shields.io/badge/tests-497%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-547%20passing-brightgreen.svg)](#testing)
 
 </div>
 
@@ -89,11 +89,12 @@ node src/cli.ts repl             # type observations at a live agent
 
 ## Architecture
 
-Six layers, strict dependency downward, cross-layer communication only on the
+Seven layers, strict dependency downward, cross-layer communication only on the
 event bus. A layering rule that cannot be checked is a layering rule that will
 be broken, so the order is exported as data:
 
 ```
+  6  skills          what the mind can do, and how fluently
   5  metacognition   how well any of the above is going
   4  planning        what is wanted, and how to get it
   3  reasoning       what follows, and what to believe
@@ -224,6 +225,47 @@ opposite remedies** — one should gather more evidence, the other should act on
 what it already has. The sign is preserved and named. And the adjustment is
 *applied*, not displayed: a calibration chart nobody acts on has taught nothing.
 
+### 6 · Skills
+
+What the mind can **do**, as distinct from what it knows. Procedural memory is a
+different kind of thing from declarative memory, and the difference is what
+makes it worth building separately:
+
+```ts
+skills.define({
+  name: 'restart the service',
+  achieves: 'the service recovers',
+  steps: [
+    { kind: 'action', name: 'warm the cache' },
+    { kind: 'action', name: 'raise the connection pool' },
+    { kind: 'action', name: 'restart the service' },
+  ],
+  prior: 0.2,     // a guess, which practice replaces
+});
+
+const attempt = await skills.attempt('restart the service', context);
+// { succeeded, masteryBefore: 0.2, masteryAfter: 0.39, cost: 0.69, ... }
+```
+
+Three properties, and the third is what makes this a separate system rather
+than a table of functions:
+
+- **Skills improve with practice, measurably.** Mastery rises with success and
+  falls with failure — and falls *faster*, because success can be luck and
+  failure usually is not.
+- **A failure of preconditions is not a failure of competence.** "I cannot do
+  this here" and "I am bad at this" are different facts, and conflating them
+  teaches a mind to avoid things it is good at. An unmet precondition moves
+  nothing and costs nothing.
+- **Practice makes a skill cheaper, not just better.** This is automatization:
+  a mastered skill costs less of the attention budget because it has stopped
+  being deliberate, so the scarce resource is freed for something else. Measured
+  at the defaults, mastering a one-step skill takes its cost from 0.69 to 0.15
+  units.
+
+Skills compose — a step may be another skill, a branch, or a repeat — and cost
+accounting charges for actual work while counting structure as free.
+
 ## Zero dependencies
 
 ```
@@ -244,7 +286,7 @@ build step. Type checking still runs under `strict` plus
 ## Testing
 
 ```bash
-node --test "test/**/*.test.ts"   # 497 tests
+node --test "test/**/*.test.ts"   # 547 tests
 npx tsc --noEmit                  # type check
 ```
 
@@ -292,10 +334,11 @@ src/
   reasoning/       world-model · beliefs
   planning/        goals · planner
   metacognition/   calibration
+  skills/          registry       ← procedural memory
   cognition/       agent          ← the integrated cycle
   scenarios/       pipeline       ← a worked demonstration
   cli.ts
-test/              497 tests across every layer, plus integration
+test/              547 tests across every layer, plus integration
 examples/          quickstart.ts  — a runnable tour
 docs/              ARCHITECTURE.md — the long-form design argument
 ```
@@ -318,13 +361,14 @@ docs/              ARCHITECTURE.md — the long-form design argument
 | Reasoning (world model · Bayesian beliefs) | 84 | ✅ complete |
 | Planning (goals · HTN planner) | 64 | ✅ complete |
 | Metacognition (calibration · bias correction) | 39 | ✅ complete |
+| Skills (procedural memory · practice · automatization) | 50 | ✅ complete |
 | Cognition (integrated cycle) | 31 | ✅ complete |
 | Integration (perception ↔ world model) | 9 | ✅ complete |
-| Reflection beyond calibration (self-model, strategy selection) | — | ⏳ planned |
+| Self-model and strategy selection | — | ⏳ planned |
 | Skill registry and composition | — | ⏳ planned |
 | LLM adapters (optional, layered on top) | — | ⏳ planned |
 
-**497 tests total.** Roughly 10,800 lines of source and 6,600 lines of tests.
+**547 tests total.** Roughly 13,000 lines of source and 8,000 lines of tests — a ratio the project is deliberate about, because the tests are the argument rather than the paperwork.
 
 ## Requirements
 

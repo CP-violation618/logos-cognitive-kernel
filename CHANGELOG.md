@@ -21,8 +21,8 @@ optional LLM adapters layered on top.
 
 ## [0.1.0] — 2025-01-01
 
-The first coherent version: six layers, an integrated cognitive cycle, a CLI,
-and 497 tests.
+The first coherent version: seven layers, an integrated cognitive cycle, a CLI,
+and 547 tests.
 
 ### Kernel
 
@@ -139,6 +139,39 @@ annotation states the intent.
 *Fixed during development:* the baseline Brier score was written `2p(1-p)`.
 Expanding "always answer the base rate" gives `p(1-p)`, so the doubling
 reported a skill of 0.5 for a forecaster with no skill at all.
+
+### Skills
+
+- **Procedural memory**: skills with mastery estimated from outcomes rather than
+  declared, composition into branches and repeats, and preconditions checked
+  before an attempt so that "I cannot do this here" is never recorded as "I am
+  bad at this".
+- **Automatization**: attention cost falls geometrically as mastery rises, so a
+  practised skill has stopped being deliberate and the scarce resource is freed
+  for something else.
+- Mastery falls faster than it rises, because success can be luck and failure
+  usually is not; and the step size shrinks with attempts so the estimate
+  converges rather than oscillating.
+
+*Fixed during development, and this one made the whole layer inert:*
+
+1. **Declared cost and charged cost were different quantities.** A one-step
+   skill declared an attention cost of 0.57 and then charged 1.0 per step, so
+   every unmastered skill was interrupted before its first action and mastery
+   could never move. Both now come from one function.
+2. **A floating-point remainder refused the first step.** Even after that fix,
+   the budget was the ROUNDED public figure (0.694) while the charge was the
+   unrounded one (0.6940000000000001), so the remainder went fractionally
+   negative and the attempt was refused as "attention exhausted". The budget is
+   now computed from the unrounded value, with an explicit tolerance, because an
+   exact-zero remainder is success and not exhaustion.
+3. **Structural steps were charged as if they were work.** A `repeat` or
+   `branch` deducted a step's worth of attention for being a container, so a
+   procedure cost more than the steps it performs and could be interrupted
+   halfway with attention spent on nothing.
+4. **A deeper frame's specific reason was overwritten by its caller's summary.**
+   "Nesting exceeded the depth limit — likely a cycle in the skill graph" became
+   "a step failed", discarding the only fact worth having.
 
 ### Cognition
 

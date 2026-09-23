@@ -57,6 +57,9 @@ export * from './planning/index.ts';
 // ── Layer 5: metacognition ──────────────────────────────────────────────────
 export * from './metacognition/index.ts';
 
+// ── Procedural memory: what the mind can do, and how fluently ───────────────
+export * from './skills/index.ts';
+
 // ── The integrated cycle ────────────────────────────────────────────────────
 export * from './cognition/index.ts';
 
@@ -77,4 +80,9 @@ export const LAYERS = Object.freeze([
   { level: 3, name: 'reasoning', purpose: 'what follows, and what to believe' },
   { level: 4, name: 'planning', purpose: 'what is wanted, and how to get it' },
   { level: 5, name: 'metacognition', purpose: 'how well any of the above is going' },
+  {
+    level: 6,
+    name: 'skills',
+    purpose: 'what the mind can do — practice makes a skill cheaper, not merely better',
+  },
 ] as const);

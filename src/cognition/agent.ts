@@ -56,6 +56,7 @@ import type { BeliefStore } from '../reasoning/beliefs.ts';
 import type { GoalSystem, Goal } from '../planning/goals.ts';
 import type { Planner, Plan, PlanState } from '../planning/planner.ts';
 import type { Calibrator } from '../metacognition/calibration.ts';
+import type { SkillRegistry } from '../skills/registry.ts';
 import type { Affect } from '../memory/types.ts';
 
 /** One cycle's worth of everything that happened. */
@@ -115,6 +116,12 @@ export interface CognitiveAgentOptions {
   readonly reflectEvery?: number;
   /** Confidence below which a plan is not acted on. */
   readonly actAbove?: number;
+  /**
+   * Optional procedural memory. When present, a plan step whose name matches a
+   * skill is performed as that skill, so practice happens as a consequence of
+   * acting rather than as a separate activity.
+   */
+  readonly skills?: SkillRegistry;
 }
 
 interface AgentState {
@@ -159,6 +166,7 @@ export class CognitiveAgent {
   readonly #environment: Environment | undefined;
   readonly #reflectEvery: number;
   readonly #actAbove: number;
+  readonly #skills: SkillRegistry | undefined;
 
   /**
    * Mutable cycle-to-cycle state.
@@ -198,6 +206,7 @@ export class CognitiveAgent {
     this.#environment = options.environment;
     this.#reflectEvery = Math.max(1, Math.floor(options.reflectEvery ?? 12));
     this.#actAbove = clampUnit(options.actAbove ?? 0.25);
+    this.#skills = options.skills;
 
     // The world model is the gate's prediction source. Wiring it here rather
     // than at construction is what resolves the circularity: the gate is needed
@@ -545,7 +554,40 @@ export class CognitiveAgent {
 
     let outcome: ActionOutcome;
     try {
-      outcome = await environment.act(step.action.name, environment.observe());
+      // A step whose name matches a known SKILL is performed as that skill.
+      //
+      // Without this the skill layer is inert: it can be defined, practised and
+      // measured, but nothing in a live cycle ever touches it, so mastery never
+      // moves and the whole layer is decoration. Wiring it here is what makes
+      // practice happen as a consequence of acting rather than as a separate
+      // activity someone has to remember to run.
+      //
+      // The skill's own preconditions are checked first. An unmet precondition
+      // means "I cannot do this here", which is not evidence about competence,
+      // so the attempt is reported as a failure to the plan without touching
+      // mastery — the same distinction the skill layer exists to preserve.
+      const skill = this.#skills?.byName(step.action.name);
+      if (skill !== undefined) {
+        const state = environment.observe();
+        const attempt = await this.#skills!.attempt(step.action.name, {
+          // `Environment.act` may be synchronous or asynchronous, so the result
+          // is awaited before being read. Assuming either shape alone would
+          // break half the environments anyone writes.
+          act: async (name) => (await environment.act(name, state)).succeeded,
+          state,
+          budget: Number.POSITIVE_INFINITY,
+        });
+        outcome = {
+          name: step.action.name,
+          succeeded: attempt.succeeded,
+          detail:
+            attempt.failure === undefined
+              ? `skill ${step.action.name} (mastery ${attempt.masteryAfter.toFixed(2)})`
+              : `skill ${step.action.name}: ${attempt.failure}`,
+        };
+      } else {
+        outcome = await environment.act(step.action.name, environment.observe());
+      }
     } catch (error) {
       outcome = { name: step.action.name, succeeded: false, detail: describe(error) };
     }

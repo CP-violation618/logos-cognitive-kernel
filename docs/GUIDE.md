@@ -939,8 +939,9 @@ kernel.health();   // HealthReport[]
 ## 14. 命令行
 
 ```bash
-node src/cli.ts demo              # 端到端认知场景（默认）
-node src/cli.ts repl              # 交互式
+node src/cli.ts tui               # 实时仪表盘 ← 最直观
+node src/cli.ts demo              # 端到端认知场景
+node src/cli.ts repl              # 逐行交互
 node src/cli.ts inspect           # 当前组装状态
 node src/cli.ts bench             # 吞吐基准
 node src/cli.ts help              # 用法
@@ -1035,6 +1036,53 @@ REPL 命令：`:state` `:beliefs` `:goals` `:memory` `:quit`
 > 没有任何测试发现它，因为**所有门控测试都显式传了 `threshold`**，没有一个用默认配置 —— 阈值和分布必须成对检查，单独看每一个都合理。
 >
 > 现在阈值是 0.28，并且 `test/gate-defaults.test.ts` 专门用**出厂默认**测试这件事，包括"新颖的安静输入仍被拒"和"熟悉的输入仍被拒"两个反向断言。
+
+### 可视化界面（`tui`）
+
+```bash
+logos tui
+```
+
+一个**实时仪表盘**：注意力、工作记忆、目标、世界模型、信念和校准，全部按 8Hz 刷新，底部有输入行。
+
+```
+┌ attention ────────────────────────┐┌ goals & action ────────────────────┐
+│ agent[tick=6 cycles=6 wm=1/7 ...] ││ active    p=0.50 understand what...│
+│                                   ││                                    │
+│ ADMITTED                          ││ PLAN                               │
+│   ▸ the primary database has ...  ││   understand what is happening     │
+│                                   ││   1 steps @ 0.76                   │
+│ REFUSED (why a mind can ignore)   ││ ACTED observe the situation ✓      │
+│   ▸ heartbeat ok      habituated  ││                                    │
+└───────────────────────────────────┘└────────────────────────────────────┘
+┌ working memory ───────────────────┐┌ world model ───────────────────────┐
+│ 6/7 slots  pressure 0.86          ││ states 8  transitions 10  obs 15   │
+│   ████████░░░░ 0.82 the primary…  ││ surprise ████████░░░░ 0.68         │
+└───────────────────────────────────┘└────────────────────────────────────┘
+┌ beliefs, calibration, memory ───────────────────────────────────────────┐
+│ beliefs 6  episodes 6 · concepts 1 · skills 3                           │
+│ calibration uninformative  n=43 brier=0.444 bias=+0.035 skill=-0.86     │
+└─────────────────────────────────────────────────────────────────────────┘
+› type an observation here
+```
+
+**输入一行观察，它走一个完整认知周期。** 底部会立刻告诉你发生了什么：
+
+| 提示 | 含义 |
+|---|---|
+| `admitted · surprise 0.87 · recalled 6` | 进去了，而且很意外 |
+| `refused (habituated)` | 同样的东西刚说过，它忽略了 |
+| `refused (below-threshold)` | 不够新颖也不够意外 |
+
+面板里的命令（输入后回车）：
+
+`:state` `:beliefs` `:goals` `:memory` `:world` `:skills` `:clear` `:help` `:quit`
+
+**为什么没有网页界面？** 这是刻意的。一个 React 前端意味着构建步骤、依赖树和供应链审计 —— 在一个**核心主张是零依赖**的仓库里。Node 自带画仪表盘需要的一切（raw mode、ANSI、HTTP 服务器），所以界面可以完整，而 `package.json` 一行不加。
+
+**它需要真终端。** 输出被重定向到管道或文件时会直接报错退出，因为一个重定向的仪表盘就是一个装满光标移动指令的文件 —— 而做这件事的人其实想要 `inspect` 或 `demo`。
+
+**退出时一定恢复光标和颜色**，否则你的 shell 会继承它们。这条有测试钉住：用 `:quit` 退出曾经留下隐藏的光标，因为 `closed` 标志被同时用来表示"停止绘制"和"已经清理完毕"。
 
 ### 装成全局命令（可选）
 

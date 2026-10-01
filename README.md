@@ -10,7 +10,7 @@ Layered memory · scarce attention · revisable belief · hierarchical planning 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.18-339933.svg)](https://nodejs.org)
 [![Dependencies](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](#zero-dependencies)
-[![Tests](https://img.shields.io/badge/tests-733%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-744%20passing-brightgreen.svg)](#testing)
 
 </div>
 
@@ -83,10 +83,16 @@ No install step. Node 22.18+ strips TypeScript types natively, so the source
 Then explore:
 
 ```bash
+node src/cli.ts tui              # live dashboard: attention, memory, goals, calibration
 node src/cli.ts inspect          # what the architecture assembles to
 node src/cli.ts bench            # ~3100 cognitive cycles per second
 node src/cli.ts repl             # type observations at a live agent
 ```
+
+The dashboard is the quickest way to see the architecture working — it shows the
+panels that change slowly enough to watch: which percepts the gate ADMITS and
+which it REFUSES, activation decaying in working memory, the world model's state
+count climbing, and the calibration verdict shifting as predictions resolve.
 
 ## Architecture
 
@@ -337,7 +343,7 @@ build step. Type checking still runs under `strict` plus
 ## Testing
 
 ```bash
-node --test "test/**/*.test.ts"   # 733 tests
+node --test "test/**/*.test.ts"   # 744 tests
 npx tsc --noEmit                  # type check
 ```
 
@@ -413,7 +419,7 @@ src/
   cognition/       agent          ← the integrated cycle
   scenarios/       pipeline       ← a worked demonstration
   cli.ts
-test/              733 tests: every layer, the integration, and the project itself
+test/              744 tests: every layer, the integration, and the project itself
 examples/          quickstart.ts  — a runnable tour
 docs/              ARCHITECTURE.md — the long-form design argument
 ```
@@ -447,12 +453,13 @@ docs/              ARCHITECTURE.md — the long-form design argument
 | Integration (perception ↔ world model) | 9 | ✅ complete |
 | Meta (the project's own claims, checked) | 27 | ✅ complete |
 | YAML lint (workflows, since a broken one fails silently) | 7 | ✅ complete |
-| CLI (argument contract, exit codes, output streams) | 15 | ✅ complete |
+| CLI (argument contract, exit codes, REPL ordering) | 19 | ✅ complete |
 | Gate defaults (a percept can actually get in) | 5 | ✅ complete |
 | Calibration grading (claim and criterion must match) | 4 | ✅ complete |
+| TUI (layout bounds, no wrapping, cursor restored) | 7 | ✅ complete |
 | Guide (the manual's own examples, executed) | 37 | ✅ complete |
 
-**733 tests total.** Roughly 14,000 lines of source and 9,000 lines of tests — a
+**744 tests total.** Roughly 14,000 lines of source and 9,000 lines of tests — a
 ratio the project is deliberate about, because the tests are the argument rather
 than the paperwork.
 

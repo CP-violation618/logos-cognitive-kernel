@@ -39,6 +39,29 @@ const cli = (...args: readonly string[]): Promise<Run> =>
     child.on('close', (code) => resolve({ code: code ?? 0, stdout, stderr }));
   });
 
+/**
+ * Drive the REPL with a scripted session.
+ *
+ * Lines are written WITHOUT waiting between them, which is the whole point: the
+ * defects this covers were timing defects, and a test that politely paused
+ * between inputs would have passed while the real thing was broken.
+ */
+const repl = (lines: readonly string[]): Promise<Run> =>
+  new Promise((resolve) => {
+    const child = spawn(process.execPath, [join(root, 'src', 'cli.ts'), 'repl'], {
+      cwd: root,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk: Buffer) => (stdout += chunk.toString()));
+    child.stderr.on('data', (chunk: Buffer) => (stderr += chunk.toString()));
+    // `:quit` is appended so a session that forgets to end cannot hang the run.
+    child.stdin.end(`${[...lines, ':quit'].join('\n')}\n`);
+    child.on('close', (code) => resolve({ code: code ?? 0, stdout, stderr }));
+  });
+
 // ── help and unknown input ──────────────────────────────────────────────────
 
 test('cli: help lists every command and exits 0', async () => {
@@ -172,4 +195,44 @@ test('cli: every documented command responds', async () => {
     assert.equal(run.code, 0, `"${args.join(' ')}" exited ${run.code}: ${run.stderr}`);
     assert.ok(run.stdout.length > 0, `"${args.join(' ')}" printed nothing`);
   }
+});
+
+// ── the repl ────────────────────────────────────────────────────────────────
+
+test('repl: :quit exits cleanly rather than crashing', async () => {
+  // `:quit` used to close the readline interface and then call `prompt()` on it,
+  // so the polite way out produced ERR_USE_AFTER_CLOSE and status 1.
+  const run = await repl([]);
+  assert.equal(run.code, 0, `the REPL exited ${run.code}: ${run.stderr}`);
+  assert.doesNotMatch(run.stderr, /ERR_USE_AFTER_CLOSE/, 'the REPL crashed on exit');
+  assert.equal(run.stderr.trim(), '', `the REPL wrote to stderr: ${run.stderr.slice(0, 200)}`);
+});
+
+test('repl: an observation is admitted and reported', async () => {
+  const run = await repl(['the primary database has stopped accepting writes']);
+  assert.match(run.stdout, /admitted 1\/1/, 'the observation was not admitted');
+});
+
+test('repl: typed lines are processed in order, not concurrently', async () => {
+  // The defect: a cycle is async and a `:command` is synchronous, so typing one
+  // after the other ran them at the same time and `:skills` reported the state
+  // from BEFORE the observation landed. Stale data is harder to notice than
+  // wrong data, because it looks like an answer.
+  //
+  // A skill is practised by the default plan, so after one admitted observation
+  // its attempt count is 1. Under the concurrent behaviour this printed 0.
+  const run = await repl(['the primary database has stopped accepting writes', ':skills']);
+  const attempts = /observe the situation\s+(\d+) attempts?/.exec(run.stdout)?.[1];
+
+  assert.ok(attempts !== undefined, `the :skills output was not found in:\n${run.stdout.slice(-400)}`);
+  assert.equal(
+    attempts,
+    '1',
+    'the command ran before the preceding observation finished, so it reported stale state',
+  );
+});
+
+test('repl: a refused observation says so instead of going quiet', async () => {
+  const run = await repl(['heartbeat ok', 'heartbeat ok', 'heartbeat ok', 'heartbeat ok']);
+  assert.match(run.stdout, /admitted \d+\/\d+/, 'no per-cycle feedback was printed at all');
 });

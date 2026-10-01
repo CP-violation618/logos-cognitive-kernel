@@ -152,7 +152,7 @@ jobs:
             console.log("dev:     " + dev.length + " (" + dev.join(", ") + ")");
           '
 
-      - name: Assert no import resolves outside node: and ./
+      - name: 'Assert no import resolves outside node: and ./'
         shell: bash
         run: |
           # Every import in src/ must be a relative path or a node: builtin.

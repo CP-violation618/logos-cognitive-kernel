@@ -21,6 +21,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { VERSION, LAYERS } from '../src/index.ts';
+import { yamlProblems } from './yaml-problems.ts';
 
 const root = join(import.meta.dirname, '..');
 
@@ -56,6 +57,7 @@ const sourceFiles = (directory = join(root, 'src')): string[] => {
  */
 const stripComments = (text: string): string =>
   text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+
 
 // ── Version agreement ───────────────────────────────────────────────────────
 
@@ -386,6 +388,27 @@ test('meta: every layer directory has a module with a header comment', () => {
 test('meta: the required top-level documents exist', () => {
   for (const name of ['README.md', 'LICENSE', 'CONTRIBUTING.md', 'CHANGELOG.md', 'SECURITY.md', 'docs/ARCHITECTURE.md']) {
     assert.doesNotThrow(() => statSync(join(root, name)), `${name} is missing`);
+  }
+});
+
+test('meta: workflow files are structurally valid YAML', () => {
+  // This check exists because its absence cost a real failure. A step was named
+  // `Assert no import resolves outside node: and ./` — unquoted, and containing
+  // `: `, which YAML reads as the start of a nested mapping. The entire workflow
+  // was rejected before a single job ran, and every run reported only "This run
+  // likely failed because of a workflow file issue".
+  //
+  // The earlier version of this test matched STRINGS in the file and so passed
+  // happily on a file GitHub would not accept. Matching text is not validating
+  // syntax, and the difference only shows up where it is most expensive.
+  const workflows = readdirSync(join(root, '.github', 'workflows')).filter((f) => f.endsWith('.yml'));
+
+  assert.ok(workflows.length > 0, 'no workflow files found');
+
+  for (const name of workflows) {
+    const text = readFileSync(join(root, '.github', 'workflows', name), 'utf8');
+    const problems = yamlProblems(text);
+    assert.deepEqual(problems, [], `.github/workflows/${name} would be rejected by GitHub:\n  ${problems.join('\n  ')}`);
   }
 });
 

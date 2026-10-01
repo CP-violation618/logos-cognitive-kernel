@@ -13,16 +13,90 @@ wrong too.
 
 ## [Unreleased]
 
-Nothing yet. The metacognitive layer beyond calibration — a self-model and
-strategy selection — is the next planned work, along with a skill registry and
-optional LLM adapters layered on top.
+Nothing yet. The next planned work is persistence — the RNG and the memory
+stores would both need a design for replay to survive across processes — and
+additional strategy kinds for the self-model.
+
+---
+
+## [0.2.0] — 2025-01-02
+
+Adds the two layers that complete the architecture: procedural memory (what the
+mind can do) and a self-model (what kind of thinker it is), plus the model
+adapter that lets a language model be attached without being trusted.
+
+### Skills — procedural memory
+
+- Skills with mastery estimated from outcomes rather than declared, composition
+  into branches and repeats, and preconditions checked before an attempt so that
+  "I cannot do this here" is never recorded as "I am bad at this".
+- Automatization: attention cost falls geometrically as mastery rises, so a
+  practised skill has stopped being deliberate and the scarce resource is freed.
+  Measured at the defaults, mastering a one-step skill takes its cost from 0.69
+  to 0.15 units.
+- Mastery falls faster than it rises, because success can be luck and failure
+  usually is not.
+
+*Fixed during development, and the first made the entire layer inert:*
+
+1. **Declared cost and charged cost were different quantities.** A one-step
+   skill declared 0.57 and charged 1.0 per step, so every unmastered skill was
+   interrupted before its first action and mastery could never move.
+2. **A floating-point remainder refused the first step.** The budget was the
+   *rounded* figure (0.694) while the charge was the unrounded one
+   (0.6940000000000001), so the remainder went fractionally negative.
+3. **Structural steps were charged as if they were work.** A `repeat` or
+   `branch` deducted a step's attention for being a container, so a procedure
+   cost more than the steps it performs.
+4. **A deeper frame's specific reason was overwritten by its caller's summary.**
+   "Nesting exceeded the depth limit — likely a cycle" became "a step failed".
+
+### Self-model — strategy selection
+
+- Six strategies measured per problem kind: recall, infer, gather, decompose,
+  apply-skill, and defer. Selection is by EFFICIENCY rather than raw success, so
+  a strategy that works 80% of the time at one unit of attention beats one that
+  works 90% at ten.
+- Evidence and heuristic are never blended: with measurements, selection follows
+  them; without, it falls back to a stated heuristic and says which it used.
+- `defer` is a real strategy — declining to answer is sometimes correct and
+  almost never modelled — and there is deliberately no "intelligence" score.
+
+*Fixed during development, and it was a sign error with an unpleasant symptom:*
+the calibrator returns a corrected confidence VALUE — a target, such as "you are
+overconfident, this should be 0.65". That was read as a BIAS of −0.25 and
+subtracted a second time, producing a confidence that RISES. A mind told it was
+overconfident became more confident, and the wronger the calibrator said it was,
+the worse the effect.
+
+### Model adapter
+
+- `ModelClient` as an interface with no bundled transport, so the
+  zero-dependency rule survives the feature most likely to have broken it. HTTP
+  clients, local servers and test doubles all satisfy it.
+- Schema validation on structured calls: a response that does not parse is
+  refused, never coerced, and NEVER retried — retrying a schema failure asks the
+  same question hoping for a different shape, which hides the model's real
+  unreliability behind a retry loop.
+- **A model's stated confidence becomes a prediction the calibrator scores.**
+  A model that says 90% and is right half the time ends up measurably
+  overconfident on that kind of task, without anyone encoding that judgement by
+  hand. This is the part almost no agent framework can do, because almost none
+  write down what the model claimed before finding out whether it was right.
+- Model output passes through the attentional gate and can be refused. A model
+  whose output cannot be ignored has become the mind, which is the failure mode
+  the design exists to prevent.
+
+*Fixed during development:* the well-formed rate returned **1** when nothing had
+parsed successfully — a fallback that turned total failure into a perfect score,
+which is the one direction a statistic must never lean.
 
 ---
 
 ## [0.1.0] — 2025-01-01
 
-The first coherent version: seven layers, an integrated cognitive cycle, a CLI,
-and 547 tests.
+The first coherent version: six layers, an integrated cognitive cycle, a CLI,
+and 497 tests.
 
 ### Kernel
 
@@ -139,39 +213,6 @@ annotation states the intent.
 *Fixed during development:* the baseline Brier score was written `2p(1-p)`.
 Expanding "always answer the base rate" gives `p(1-p)`, so the doubling
 reported a skill of 0.5 for a forecaster with no skill at all.
-
-### Skills
-
-- **Procedural memory**: skills with mastery estimated from outcomes rather than
-  declared, composition into branches and repeats, and preconditions checked
-  before an attempt so that "I cannot do this here" is never recorded as "I am
-  bad at this".
-- **Automatization**: attention cost falls geometrically as mastery rises, so a
-  practised skill has stopped being deliberate and the scarce resource is freed
-  for something else.
-- Mastery falls faster than it rises, because success can be luck and failure
-  usually is not; and the step size shrinks with attempts so the estimate
-  converges rather than oscillating.
-
-*Fixed during development, and this one made the whole layer inert:*
-
-1. **Declared cost and charged cost were different quantities.** A one-step
-   skill declared an attention cost of 0.57 and then charged 1.0 per step, so
-   every unmastered skill was interrupted before its first action and mastery
-   could never move. Both now come from one function.
-2. **A floating-point remainder refused the first step.** Even after that fix,
-   the budget was the ROUNDED public figure (0.694) while the charge was the
-   unrounded one (0.6940000000000001), so the remainder went fractionally
-   negative and the attempt was refused as "attention exhausted". The budget is
-   now computed from the unrounded value, with an explicit tolerance, because an
-   exact-zero remainder is success and not exhaustion.
-3. **Structural steps were charged as if they were work.** A `repeat` or
-   `branch` deducted a step's worth of attention for being a container, so a
-   procedure cost more than the steps it performs and could be interrupted
-   halfway with attention spent on nothing.
-4. **A deeper frame's specific reason was overwritten by its caller's summary.**
-   "Nesting exceeded the depth limit — likely a cycle in the skill graph" became
-   "a step failed", discarding the only fact worth having.
 
 ### Cognition
 

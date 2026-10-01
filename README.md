@@ -10,7 +10,7 @@ Layered memory · scarce attention · revisable belief · hierarchical planning 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.6-339933.svg)](https://nodejs.org)
 [![Dependencies](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](#zero-dependencies)
-[![Tests](https://img.shields.io/badge/tests-547%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-638%20passing-brightgreen.svg)](#testing)
 
 </div>
 
@@ -31,14 +31,15 @@ intelligence" is actually made of.
 **This is not an AGI, and it does not claim to be.** Nobody has built one.
 Any repository that says otherwise is optimising for stars.
 
-**This is not an LLM wrapper.** There is no model, no API key, and no prompt
-anywhere in this codebase. LOGOS is the other half: the part that decides what
-to remember, what to attend to, what to believe, and what to do. Wiring a
-language model into it is a later, optional step — the layers are deliberately
-agnostic about where percepts come from.
+**This is not an LLM wrapper.** There is no bundled model, no API key, and no
+prompt template that this project depends on. LOGOS is the other half: the part
+that decides what to remember, what to attend to, what to believe, and what to
+do. A model can be *attached* — there is an adapter for that — but it arrives as
+one fallible source of percepts among others rather than as the thing doing the
+thinking. See [Attaching a model](#attaching-a-model).
 
-**This is not a finished product.** Metacognitive reflection beyond calibration
-is in progress. The API will change.
+**This is not a finished product.** Metacognitive strategy selection is new and
+the API will change.
 
 ## The claim being tested
 
@@ -266,6 +267,56 @@ than a table of functions:
 Skills compose — a step may be another skill, a branch, or a repeat — and cost
 accounting charges for actual work while counting structure as free.
 
+## Attaching a model
+
+A language model can be attached, and the design decision that matters is how it
+is *contained* rather than how it is called. A model is not an oracle. It is a
+fluent, useful, and frequently wrong source of percepts and hypotheses, and it
+enters the architecture the way anything else does.
+
+```ts
+import { ModelAdapter, type ModelClient } from 'logos-cognitive-kernel';
+
+// Bring your own transport. HTTP, a local server, a test double — the package
+// bundles none of them, which is how the zero-dependency rule survives the
+// feature most likely to have broken it.
+const client: ModelClient = {
+  name: 'my-model',
+  async complete(request) {
+    const response = await fetch(/* ... */);
+    const body = await response.json();
+    return { content: body.text, confidence: body.confidence, tokens: body.usage?.total };
+  },
+};
+
+const adapter = new ModelAdapter({ clock, bus, rng, client, gate, beliefs, calibrator });
+
+// Free text: routed through the attentional gate, so it can be REFUSED.
+await adapter.ask('what is likely wrong with the pump?');
+
+// Structured: refused outright if the shape does not match, never coerced.
+const outcome = await adapter.askStructured('what went wrong?', {
+  cause: 'string',
+  severity: 'number',
+  likelyCauses: 'string[]',
+});
+```
+
+Four properties, each of which is a deliberate constraint rather than a feature:
+
+| | |
+|---|---|
+| **The model is untrusted input** | Output is parsed and validated against a declared shape. A response that does not parse is refused, not coerced — `"5"` where a number was asked for has not answered the question. |
+| **A schema failure is never retried** | Transport failures are retried, because they say nothing about the output. A malformed response is not, because retrying it asks the same question hoping for a different shape, which hides the model's real unreliability behind a retry loop. |
+| **The model's confidence is a claim** | When a model says it is 90% sure, that becomes a *prediction the calibrator scores*. A model that says 90% and is right half the time ends up measurably overconfident on that kind of task — no one has to encode that judgement by hand. |
+| **The model never acts** | It produces text, claims and candidate plans. Every effect on the world goes through the skill registry and the planner, which have their own preconditions and accounting. |
+
+The third row is the interesting one. Calibration turns a model's self-reported
+confidence from rhetoric into a measured property, and the architecture can then
+discount it — which is a thing almost no agent framework can do, because almost
+none of them write down what the model claimed before finding out whether it was
+right.
+
 ## Zero dependencies
 
 ```
@@ -286,7 +337,7 @@ build step. Type checking still runs under `strict` plus
 ## Testing
 
 ```bash
-node --test "test/**/*.test.ts"   # 547 tests
+node --test "test/**/*.test.ts"   # 638 tests
 npx tsc --noEmit                  # type check
 ```
 
@@ -331,14 +382,14 @@ src/
   kernel/          clock · bus · scheduler · rng · config · types
   memory/          vector · working · episodic · semantic · consolidation · remember
   perception/      gate
-  reasoning/       world-model · beliefs
+  reasoning/       world-model · beliefs · model-adapter
   planning/        goals · planner
   metacognition/   calibration
   skills/          registry       ← procedural memory
   cognition/       agent          ← the integrated cycle
   scenarios/       pipeline       ← a worked demonstration
   cli.ts
-test/              547 tests across every layer, plus integration
+test/              638 tests across every layer, plus integration
 examples/          quickstart.ts  — a runnable tour
 docs/              ARCHITECTURE.md — the long-form design argument
 ```
@@ -360,15 +411,13 @@ docs/              ARCHITECTURE.md — the long-form design argument
 | Perception (salience · habituation · load adaptation) | 34 | ✅ complete |
 | Reasoning (world model · Bayesian beliefs) | 84 | ✅ complete |
 | Planning (goals · HTN planner) | 64 | ✅ complete |
-| Metacognition (calibration · bias correction) | 39 | ✅ complete |
+| Metacognition (calibration · bias correction · self-model) | 78 | ✅ complete |
 | Skills (procedural memory · practice · automatization) | 50 | ✅ complete |
+| Model adapter (containment · schema validation · confidence scoring) | 52 | ✅ complete |
 | Cognition (integrated cycle) | 31 | ✅ complete |
 | Integration (perception ↔ world model) | 9 | ✅ complete |
-| Self-model and strategy selection | — | ⏳ planned |
-| Skill registry and composition | — | ⏳ planned |
-| LLM adapters (optional, layered on top) | — | ⏳ planned |
 
-**547 tests total.** Roughly 13,000 lines of source and 8,000 lines of tests — a ratio the project is deliberate about, because the tests are the argument rather than the paperwork.
+**638 tests total.** Roughly 13,000 lines of source and 8,000 lines of tests — a ratio the project is deliberate about, because the tests are the argument rather than the paperwork.
 
 ## Requirements
 

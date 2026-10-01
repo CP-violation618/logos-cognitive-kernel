@@ -12,7 +12,7 @@ That narrows the realistic concerns considerably, but does not eliminate them.
 
 ## Reporting a vulnerability
 
-Open a [private security advisory](https://github.com/yourname/logos-cognitive-kernel/security/advisories/new)
+Open a [private security advisory](https://github.com/CP-violation618/logos-cognitive-kernel/security/advisories/new)
 rather than a public issue.
 
 Please include:

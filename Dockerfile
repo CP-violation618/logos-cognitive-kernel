@@ -17,7 +17,7 @@ FROM node:24-alpine
 LABEL org.opencontainers.image.title="LOGOS cognitive kernel"
 LABEL org.opencontainers.image.description="A zero-dependency cognitive kernel for AGI research"
 LABEL org.opencontainers.image.licenses="MIT"
-LABEL org.opencontainers.image.source="https://github.com/yourname/logos-cognitive-kernel"
+LABEL org.opencontainers.image.source="https://github.com/CP-violation618/logos-cognitive-kernel"
 
 WORKDIR /logos
 

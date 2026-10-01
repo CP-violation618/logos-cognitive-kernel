@@ -64,10 +64,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourname/logos-cognitive-kernel.git"
+    "url": "https://github.com/CP-violation618/logos-cognitive-kernel.git"
   },
   "bugs": {
-    "url": "https://github.com/yourname/logos-cognitive-kernel/issues"
+    "url": "https://github.com/CP-violation618/logos-cognitive-kernel/issues"
   },
-  "homepage": "https://github.com/yourname/logos-cognitive-kernel#readme"
+  "homepage": "https://github.com/CP-violation618/logos-cognitive-kernel#readme"
 }

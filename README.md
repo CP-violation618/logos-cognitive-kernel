@@ -6,7 +6,7 @@
 
 Layered memory · scarce attention · revisable belief · hierarchical planning · self-measurement
 
-[![CI](https://github.com/yourname/logos-cognitive-kernel/actions/workflows/ci.yml/badge.svg)](https://github.com/yourname/logos-cognitive-kernel/actions/workflows/ci.yml)
+[![CI](https://github.com/CP-violation618/logos-cognitive-kernel/actions/workflows/ci.yml/badge.svg)](https://github.com/CP-violation618/logos-cognitive-kernel/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.6-339933.svg)](https://nodejs.org)
 [![Dependencies](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](#zero-dependencies)
@@ -58,7 +58,7 @@ Calibration is a number. Forgetting is a curve with a half-life.
 ## Quick start
 
 ```bash
-git clone https://github.com/yourname/logos-cognitive-kernel.git
+git clone https://github.com/CP-violation618/logos-cognitive-kernel.git
 cd logos-cognitive-kernel
 node src/cli.ts demo
 ```

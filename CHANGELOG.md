@@ -284,5 +284,5 @@ than by any unit test:*
 
 ---
 
-[Unreleased]: https://github.com/yourname/logos-cognitive-kernel/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/yourname/logos-cognitive-kernel/releases/tag/v0.1.0
+[Unreleased]: https://github.com/CP-violation618/logos-cognitive-kernel/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/CP-violation618/logos-cognitive-kernel/releases/tag/v0.1.0

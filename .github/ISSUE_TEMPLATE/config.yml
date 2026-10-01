@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Read the architecture document first
-    url: https://github.com/yourname/logos-cognitive-kernel/blob/main/docs/ARCHITECTURE.md
+    url: https://github.com/CP-violation618/logos-cognitive-kernel/blob/main/docs/ARCHITECTURE.md
     about: The long-form design argument. Most "why is it like this" questions are answered here.
   - name: How to contribute
-    url: https://github.com/yourname/logos-cognitive-kernel/blob/main/CONTRIBUTING.md
+    url: https://github.com/CP-violation618/logos-cognitive-kernel/blob/main/CONTRIBUTING.md
     about: The two rules, the style, and what a good test looks like in this project.

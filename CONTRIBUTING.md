@@ -26,7 +26,7 @@ disagreeing.
 ## Getting started
 
 ```bash
-git clone https://github.com/yourname/logos-cognitive-kernel.git
+git clone https://github.com/CP-violation618/logos-cognitive-kernel.git
 cd logos-cognitive-kernel
 npm install --include=dev
 npm run verify

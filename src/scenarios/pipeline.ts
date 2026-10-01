@@ -20,6 +20,7 @@
  */
 
 import { Kernel } from '../kernel/kernel.ts';
+import { preset, type PresetName } from '../kernel/config.ts';
 import { WorkingMemory } from '../memory/working.ts';
 import { EpisodicMemory } from '../memory/episodic.ts';
 import { SemanticMemory } from '../memory/semantic.ts';
@@ -129,20 +130,32 @@ const REPAIR_CYCLES = 12;
  * first incident, and a mind that has learned the incident's shape must
  * recognise the repair. A single undifferentiated stream would test neither.
  */
-export async function runPipelineScenario(options: { readonly seed?: number; readonly verbose?: boolean } = {}): Promise<ScenarioResult> {
+export async function runPipelineScenario(
+  options: { readonly seed?: number; readonly verbose?: boolean; readonly preset?: PresetName } = {},
+): Promise<ScenarioResult> {
   const seed = options.seed ?? 0x5eed;
   const verbose = options.verbose ?? false;
   const say = (line: string): void => {
     if (verbose) console.log(line);
   };
 
+  // The scenario's own overrides win over the preset, because they are what
+  // makes the three phases observable — but they are applied ON TOP of the
+  // preset rather than replacing it, so `--preset research` still changes
+  // capacities and thresholds the scenario does not name.
   const kernel = new Kernel({
-    config: { seed, memory: { consolidationAgeTicks: 6, attentionThreshold: 0.32 } },
+    config: preset(options.preset ?? 'default', {
+      seed,
+      memory: { consolidationAgeTicks: 6, attentionThreshold: 0.32 },
+    }),
   });
 
-  const working = new WorkingMemory({ capacity: 7 });
-  const episodic = new EpisodicMemory({ baseHalfLife: 600 });
-  const semantic = new SemanticMemory({ baseHalfLife: 6_000 });
+  // Working memory follows the configuration rather than being hardcoded, so
+  // that a preset which changes the capacity actually changes the mind.
+
+  const working = new WorkingMemory({ capacity: kernel.config.memory.workingSlots });
+  const episodic = new EpisodicMemory({ baseHalfLife: kernel.config.memory.forgettingHalfLifeTicks * 1.5 });
+  const semantic = new SemanticMemory({ baseHalfLife: kernel.config.memory.forgettingHalfLifeTicks * 15 });
   const consolidation = new ConsolidationEngine({
     clock: kernel.clock,
     bus: kernel.bus,

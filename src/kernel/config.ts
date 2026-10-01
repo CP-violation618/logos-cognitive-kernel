@@ -122,7 +122,27 @@ const BASE: KernelConfig = {
 
   memory: {
     workingSlots: 7,
-    attentionThreshold: 0.35,
+    /**
+     * Salience a percept must reach to enter working memory.
+     *
+     * 0.28 rather than 0.35, and the arithmetic is the reason. The gate weights
+     * are surprise .35, novelty .25, relevance .20, intensity .10, affect .10,
+     * so an observation that is MAXIMALLY NOVEL and nothing else scores
+     * 0.25 + 0.10·intensity — at most 0.35, and only if it is also as loud as
+     * the scale allows.
+     *
+     * At the old 0.35 the ceiling and the threshold were exactly equal, which
+     * meant a first observation of anything was admitted only at full
+     * intensity. Anything typed into the REPL at the documented 0.8 scored
+     * 0.33 and was silently refused, so the interactive mode could not admit a
+     * single percept. Worse, the gate was rejecting precisely the case it
+     * exists to admit: something wholly unexpected.
+     *
+     * 0.28 admits a maximally novel observation at intensity >= 0.3 while still
+     * refusing a familiar one, because a repeat carries novelty near 0 and
+     * cannot reach the threshold on intensity alone.
+     */
+    attentionThreshold: 0.28,
     workingDecayTicks: 12,
     consolidationAgeTicks: 40,
     forgettingHalfLifeTicks: 500,

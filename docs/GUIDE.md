@@ -946,23 +946,39 @@ node src/cli.ts bench             # 吞吐基准
 node src/cli.ts help              # 用法
 ```
 
-**通用参数**：
+**参数**：
 
-```
---seed <n>        随机种子（决定一切）
---cycles <n>      跑多少个周期
---preset <name>   default | reflective | reactive | research | minimal
---quiet           只输出摘要
---json            机器可读输出
-```
+| 参数 | 作用范围 | 说明 |
+|---|---|---|
+| `--seed <n>` | 全部命令 | 随机种子（十进制或 `0x` 前缀），决定一切 |
+| `--preset <name>` | `demo` · `repl` · `inspect` | `default` \| `reflective` \| `reactive` \| `research` \| `minimal` |
+| `--cycles <n>` | **仅 `bench`** | 周期数。demo 的三段长度是固定的 |
+| `--quiet` | `demo` | 只输出摘要 |
+| `--json` | `inspect` | 机器可读输出 |
 
 ```bash
-node src/cli.ts demo --seed 1234 --cycles 200
-node src/cli.ts inspect --json | jq .
+node src/cli.ts demo --seed 1234
+node src/cli.ts demo --preset research
+node src/cli.ts inspect --preset minimal
+node src/cli.ts inspect --json --seed 777 | jq .
 node src/cli.ts bench --cycles 500
 ```
 
-`--json` 的输出保证是合法 JSON，CI 会验证这一点。
+**两个输出契约**（都有测试保证）：
+
+- `--json` 的 stdout **只有那个 JSON 文档**，没有横幅、没有额外日志。一个先打印问候语的 JSON 模式不是 JSON 模式 —— 下游要解析它。
+- `--quiet` 缩短输出但**保留 summary 行**。
+
+**未知的 preset 是错误，不是静默回退**：
+
+```bash
+$ node src/cli.ts demo --preset nonsense
+error: unknown preset "nonsense". Available: default, reflective, reactive, research, minimal
+$ echo $?
+2
+```
+
+静默回退到默认是更糟的选择：一个拼写错误会产生一次"看起来正常但配置是错的"运行。
 
 ### 预设
 
@@ -975,6 +991,70 @@ node src/cli.ts bench --cycles 500
 | `minimal` | 最小可用配置，用于测试 |
 
 预设只是 `config` 的值集合，可以在 `new Kernel({ config: { ... } })` 里逐项覆盖。
+
+实测的差别（同一场景，只换预设）：
+
+| 预设 | working memory | demo 结果 |
+|---|---|---|
+| `minimal` | 4 槽 | 4 episodes, 4 beliefs |
+| `default` | 7 槽 | 6 episodes, 6 beliefs |
+| `research` | 12 槽 | 6 episodes, 6 beliefs |
+
+### 交互模式（`repl`）
+
+```bash
+node src/cli.ts repl
+```
+
+```
+logos> the primary database has stopped accepting writes
+  admitted 1/1, surprise 0.00, recalled 2, acted: observe the situation
+```
+
+敲一行观察，智能体走一个完整认知周期，然后告诉你这一轮发生了什么。
+
+**`admitted` 可能小于 `perceptsOffered` —— 你的输入被门控拒了。** 这在两种情况下是正确的：
+
+- **你说的话既新颖又在意料之中**（新颖度低、意外度低）：心智有理由忽略它
+- **同样的东西你刚说过**：习惯化生效了，一个一直在响的警报会被忽略
+
+如果输入进不去，让它更容易进来的办法：
+
+| 办法 | 为什么有效 |
+|---|---|
+| 换 `--preset reactive` | 阈值更低 |
+| 先喂几轮，让世界模型建立转移 | 之后违背预期的输入才有 `surprise` 可拿，而 surprise 是权重最高的一项（0.35） |
+| 说得更出乎意料 | `the datacentre is on fire` 比 `the database is slow` 显著得多 |
+
+REPL 命令：`:state` `:beliefs` `:goals` `:memory` `:quit`
+
+> **一段值得知道的历史。** 这个模式曾经**任何输入都进不去**。门控权重里新颖度占 0.25，而默认阈值是 0.35 —— 一个"最大新颖度"的观察最高只能得 0.35 分，还必须 `intensity` 拉满才够。REPL 用 0.8，得 0.33，**每一条输入都被静默拒绝**，敲一天也看不到任何反应。
+>
+> 更糟的是，这等于门控在拒绝**它存在的理由**：完全出乎意料的事本该抓住注意力。
+>
+> 没有任何测试发现它，因为**所有门控测试都显式传了 `threshold`**，没有一个用默认配置 —— 阈值和分布必须成对检查，单独看每一个都合理。
+>
+> 现在阈值是 0.28，并且 `test/gate-defaults.test.ts` 专门用**出厂默认**测试这件事，包括"新颖的安静输入仍被拒"和"熟悉的输入仍被拒"两个反向断言。
+
+### 装成全局命令（可选）
+
+想在任意目录直接敲 `logos`：
+
+```bash
+cd <项目目录>
+npm link
+```
+
+之后：
+
+```bash
+cd ~
+logos demo --seed 1234
+logos bench --cycles 500
+logos inspect --preset research
+```
+
+`npm link` 会在全局 npm 目录建一个软链接指回这个项目 —— **改了源码立刻生效，不用重新 link**。卸载用 `npm unlink -g logos-cognitive-kernel`。
 
 ---
 
@@ -1004,31 +1084,45 @@ node src/cli.ts bench --cycles 500
 
 用 `agent.run(n, () => [percept, ...])` 喂输入。
 
-### ⑥ 忘了 `gate.setPredictor(world)`
+### ⑥ REPL 里输入被拒绝
+
+显示 `admitted 0/1`，什么都没发生。**通常这是正确行为**：那句话既不够新颖也不够意外，或者同样的东西刚说过（习惯化）。
+
+想让它进去：换 `--preset reactive`、先喂几轮建立世界模型转移、或者说得更出乎意料。
+
+**但如果你发现无论说什么都进不去**，那是 bug 不是特性 —— 这个模式曾经真的有过（阈值 0.35 vs 新颖度上限 0.35），修在 `test/gate-defaults.test.ts` 里。
+
+### ⑦ CLI 的 `--cycles` 对 demo 无效
+
+`--cycles` **只对 `bench` 生效**。demo 的三段（平静 / 事故 / 修复）长度是固定的，因为要观察的正是**阶段之间的转变**。
+
+`demo` 44 个周期、`bench` 可配 —— 这是设计不是遗漏。
+
+### ⑧ 忘了 `gate.setPredictor(world)`
 
 不设的话 `surprise` 项退化为中性值，门控失去了最重要的信号。
 
-### ⑦ 自己 new 时钟
+### ⑨ 自己 new 时钟
 
 所有层必须共享同一个 `Kernel` 的 `clock`。分开的时钟会让记忆衰减和调度器脱节，而且现象很隐蔽 —— 记忆就是"莫名其妙不衰减"或"莫名其妙忘光了"。
 
-### ⑧ 期望一个周期完成一个目标
+### ⑩ 期望一个周期完成一个目标
 
 每个周期推进一步。跑够周期数。
 
-### ⑨ 用情景记忆当审计日志
+### ⑪ 用情景记忆当审计日志
 
 每次检索都会**改写**它（再巩固）。要不可变的记录，用事件总线。
 
-### ⑩ `Method` 同时给了 `subtasks` 和 `actions`
+### ⑫ `Method` 同时给了 `subtasks` 和 `actions`
 
 二选一。给两个会抛错。
 
-### ⑪ 在 `src/` 里 import 了非相对路径
+### ⑬ 在 `src/` 里 import 了非相对路径
 
 CI 和元测试都会拦。所有 import 必须是相对路径或 `node:` 内置模块。
 
-### ⑫ 用了 `enum` / `namespace` / 参数属性
+### ⑭ 用了 `enum` / `namespace` / 参数属性
 
 Node 的类型擦除不能处理它们（它们会生成运行时代码）。`tsconfig` 里开了 `erasableSyntaxOnly`，类型检查会拦住。
 

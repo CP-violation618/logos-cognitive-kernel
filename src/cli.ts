@@ -20,7 +20,7 @@
  */
 
 import { parseArgs } from 'node:util';
-import { Kernel, availablePresets, preset } from '../src/kernel/index.ts';
+import { Kernel, availablePresets, preset, type PresetName } from '../src/kernel/index.ts';
 import { WorkingMemory } from '../src/memory/working.ts';
 import { EpisodicMemory } from '../src/memory/episodic.ts';
 import { SemanticMemory } from '../src/memory/semantic.ts';
@@ -49,14 +49,16 @@ Commands:
   help              Show this text
 
 Options:
-  --seed <n>        Deterministic seed (decimal or 0x-prefixed)
-  --cycles <n>      Cycle count for bench
-  --quiet           Suppress the scenario's narration
+  --seed <n>        Deterministic seed (decimal or 0x-prefixed). Affects every command.
   --preset <name>   Configuration preset: ${availablePresets().join(', ')}
-  --json            Emit machine-readable output
+                    Applies to demo, repl and inspect. An unknown name is an error.
+  --cycles <n>      Cycle count. Bench only — the demo's phases have fixed lengths.
+  --quiet           Suppress the scenario's narration (demo)
+  --json            Emit machine-readable output (inspect)
 
 Examples:
   logos demo --seed 1234
+  logos demo --preset research
   logos bench --cycles 500
   logos inspect --json
 
@@ -175,8 +177,8 @@ function assemble(seed: number, presetName: string, environment?: Environment): 
 
 // ── commands ────────────────────────────────────────────────────────────────
 
-async function commandDemo(seed: number, quiet: boolean): Promise<number> {
-  const result = await runPipelineScenario({ seed, verbose: !quiet });
+async function commandDemo(seed: number, quiet: boolean, presetName: PresetName): Promise<number> {
+  const result = await runPipelineScenario({ seed, verbose: !quiet, preset: presetName });
 
   const report = result.calibrator.report('world-model');
   process.stdout.write(
@@ -184,13 +186,14 @@ async function commandDemo(seed: number, quiet: boolean): Promise<number> {
       `${result.semantic.size} concepts, ${result.beliefs.size} beliefs, ` +
       `${result.world.log.length} actions\n` +
       `         calibration ${report.verdict} (brier ${report.brier.toFixed(3)}, ` +
-      `bias ${report.bias >= 0 ? '+' : ''}${report.bias.toFixed(3)})\n`,
+      `bias ${report.bias >= 0 ? '+' : ''}${report.bias.toFixed(3)})\n` +
+      `         preset ${presetName}\n`,
   );
   return 0;
 }
 
-async function commandInspect(seed: number, json: boolean): Promise<number> {
-  const assembly = assemble(seed, 'default');
+async function commandInspect(seed: number, json: boolean, presetName: PresetName): Promise<number> {
+  const assembly = assemble(seed, presetName);
   await assembly.kernel.start();
 
   const state = {
@@ -273,10 +276,10 @@ async function commandBench(cycles: number, seed: number): Promise<number> {
   return 0;
 }
 
-async function commandRepl(seed: number): Promise<number> {
+async function commandRepl(seed: number, presetName: PresetName): Promise<number> {
   const readline = await import('node:readline');
   const environment = inertEnvironment();
-  const assembly = assemble(seed, 'default', environment);
+  const assembly = assemble(seed, presetName, environment);
   await assembly.kernel.start();
 
   const goal = assembly.goals.declare('understand what is happening', { utility: 0.8 });
@@ -284,7 +287,7 @@ async function commandRepl(seed: number): Promise<number> {
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout, prompt: 'logos> ' });
 
-  process.stdout.write(`LOGOS v${VERSION} — interactive session (seed ${seed})\n`);
+  process.stdout.write(`LOGOS v${VERSION} — interactive session (seed ${seed}, preset ${presetName})\n`);
   process.stdout.write(`Type observations to feed the agent. Commands: :state  :beliefs  :goals  :memory  :quit\n\n`);
   rl.prompt();
 
@@ -326,8 +329,12 @@ async function commandRepl(seed: number): Promise<number> {
       return;
     }
 
+    // Intensity 1.0 because this is not ambient input: a person typed it and is
+    // waiting for an answer, which is as deliberate as attention gets. It used
+    // to be 0.8, which combined with the old default threshold meant the REPL
+    // refused every single percept.
     const report = await assembly.agent.cycle([
-      { content: text, source: 'user', modality: 'text', intensity: 0.8 },
+      { content: text, source: 'user', modality: 'text', intensity: 1 },
     ]);
     process.stdout.write(
       `  admitted ${report.perceptsAdmitted}/${report.perceptsOffered}` +
@@ -373,11 +380,22 @@ async function main(): Promise<number> {
     return 0;
   }
 
+  // An unknown preset is rejected BEFORE anything runs. Silently falling back
+  // to the default would mean a typo produced a working run with the wrong
+  // configuration, which is the worst of both worlds.
+  const presetName = (values.preset ?? 'default') as PresetName;
+  if (!availablePresets().includes(presetName)) {
+    process.stderr.write(
+      `error: unknown preset "${String(values.preset)}". Available: ${availablePresets().join(', ')}\n`,
+    );
+    return 2;
+  }
+
   switch (command) {
     case 'demo':
-      return commandDemo(seed, values.quiet === true);
+      return commandDemo(seed, values.quiet === true, presetName);
     case 'inspect':
-      return commandInspect(seed, values.json === true);
+      return commandInspect(seed, values.json === true, presetName);
     case 'bench': {
       const cycles = Number(values.cycles ?? 200);
       if (!Number.isFinite(cycles) || cycles < 1) {
@@ -387,7 +405,7 @@ async function main(): Promise<number> {
       return commandBench(Math.floor(cycles), seed);
     }
     case 'repl':
-      return commandRepl(seed);
+      return commandRepl(seed, presetName);
     default:
       process.stderr.write(`error: unknown command "${command}"\n\n${HELP}`);
       return 2;

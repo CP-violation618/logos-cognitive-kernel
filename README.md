@@ -10,7 +10,7 @@ Layered memory · scarce attention · revisable belief · hierarchical planning 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.18-339933.svg)](https://nodejs.org)
 [![Dependencies](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](#zero-dependencies)
-[![Tests](https://img.shields.io/badge/tests-670%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-709%20passing-brightgreen.svg)](#testing)
 
 </div>
 
@@ -337,7 +337,7 @@ build step. Type checking still runs under `strict` plus
 ## Testing
 
 ```bash
-node --test "test/**/*.test.ts"   # 670 tests
+node --test "test/**/*.test.ts"   # 709 tests
 npx tsc --noEmit                  # type check
 ```
 
@@ -413,13 +413,19 @@ src/
   cognition/       agent          ← the integrated cycle
   scenarios/       pipeline       ← a worked demonstration
   cli.ts
-test/              670 tests: every layer, the integration, and the project itself
+test/              709 tests: every layer, the integration, and the project itself
 examples/          quickstart.ts  — a runnable tour
 docs/              ARCHITECTURE.md — the long-form design argument
 ```
 
 ## Documentation
 
+- **[docs/GUIDE.md](docs/GUIDE.md)** — the manual. Installation, a five-minute
+  starter, one section per layer, assembling the full agent, attaching a model,
+  determinism, the CLI, and a list of the traps that have actually caught people
+  using this. **Every example in it is executed by `test/guide.test.ts`**, so the
+  code you copy runs — the duplication between the guide and that test file is
+  the price of being able to say so.
 - **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — the design argument in
   full: why each layer exists, what the alternatives were, and what each choice
   costs.
@@ -439,10 +445,11 @@ docs/              ARCHITECTURE.md — the long-form design argument
 | Skills (procedural memory · practice · automatization) | 50 | ✅ complete |
 | Cognition (integrated cycle) | 31 | ✅ complete |
 | Integration (perception ↔ world model) | 9 | ✅ complete |
-| Meta (the project's own claims, checked) | 25 | ✅ complete |
+| Meta (the project's own claims, checked) | 27 | ✅ complete |
 | YAML lint (workflows, since a broken one fails silently) | 7 | ✅ complete |
+| Guide (the manual's own examples, executed) | 37 | ✅ complete |
 
-**670 tests total.** Roughly 14,000 lines of source and 9,000 lines of tests — a
+**709 tests total.** Roughly 14,000 lines of source and 9,000 lines of tests — a
 ratio the project is deliberate about, because the tests are the argument rather
 than the paperwork.
 

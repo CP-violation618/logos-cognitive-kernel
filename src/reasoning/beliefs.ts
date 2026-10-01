@@ -458,6 +458,40 @@ export class BeliefStore {
     const record = this.#find(proposition);
     if (record === undefined) return undefined;
 
+    // Refuse a belief id where an evidence id belongs.
+    //
+    // `addEvidence` returns a `Belief`, whose `.id` is the PROPOSITION's id, so
+    // `retract(p, store.addEvidence(p, e).id)` reads as obviously correct and is
+    // wrong. Both are strings, so nothing at the type level objects, and the
+    // failure was previously SILENT: `findIndex` returned -1, the method
+    // returned the unchanged belief, and the caller had no way to tell that
+    // nothing had been retracted. Someone trusting it would go on believing
+    // they had withdrawn evidence they had not.
+    if (record.id === evidenceId) {
+      throw new LogosError(
+        'BELIEF_WRONG_ID',
+        `retract() needs an EVIDENCE id, but was given the id of the belief itself ("${evidenceId}"). ` +
+          'The evidence id is on `belief.evidence[i].id` — note that `addEvidence` returns a Belief, ' +
+          'so its `.id` is the proposition, not the evidence it just added.',
+        { proposition, given: evidenceId, evidenceIds: record.evidence.map((e) => e.id) },
+      );
+    }
+
+    // The same mistake one step along: an evidence id belonging to a DIFFERENT
+    // proposition. Also previously silent.
+    if (!record.evidence.some((e) => e.id === evidenceId)) {
+      const elsewhere = [...this.#beliefs.values()].find((other) =>
+        other.evidence.some((e) => e.id === evidenceId),
+      );
+      if (elsewhere !== undefined) {
+        throw new LogosError(
+          'BELIEF_WRONG_PROPOSITION',
+          `evidence "${evidenceId}" belongs to "${elsewhere.proposition}", not "${record.proposition}"`,
+          { proposition, given: evidenceId, belongsTo: elsewhere.proposition },
+        );
+      }
+    }
+
     const index = record.evidence.findIndex((e) => e.id === evidenceId);
     if (index === -1) return this.#view(record);
 

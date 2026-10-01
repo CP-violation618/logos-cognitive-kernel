@@ -534,3 +534,147 @@ test('meta: every path the Dockerfile copies exists in the repository', () => {
     );
   }
 });
+
+// ── The manual stays true ───────────────────────────────────────────────────
+
+test('meta: every guide section that shows code has a test exercising it', () => {
+  // A manual with untested examples is a manual that is wrong within a month.
+  // The guide's examples live in `test/guide.test.ts`, and this check is what
+  // keeps the two in step.
+  //
+  // Scanned line by line rather than with one regex across the whole file: a
+  // greedy multi-line pattern attributed both of section 10's examples to that
+  // one section and then reported the second as uncovered, which was a defect
+  // in the CHECK rather than in the guide.
+  const guide = readFileSync(join(root, 'docs', 'GUIDE.md'), 'utf8');
+  const tests = readFileSync(join(root, 'test', 'guide.test.ts'), 'utf8');
+
+  /** Guide section -> the `guide N:` test numbers that exercise its examples. */
+  const COVERAGE: Readonly<Record<number, readonly number[]>> = Object.freeze({
+    2: [2],   // the five-minute starter
+    4: [1],   // the kernel
+    5: [2],   // memory
+    6: [3],   // attention
+    7: [4],   // reasoning
+    8: [5],   // goals and planning
+    9: [6],   // metacognition
+    10: [7],  // skills
+    11: [8],  // the integrated agent
+    12: [10], // the model adapter
+    13: [11], // determinism and debugging
+  });
+
+  /**
+   * Sections whose code blocks are deliberately untested.
+   *
+   * Both are reference material rather than narrative: the API quick reference
+   * is a bare list of signatures with nothing to execute, and the extension
+   * section describes how to register a subsystem using pieces of the standard
+   * library, not a runnable program. They are listed here rather than silently
+   * skipped so the exclusion is a decision someone made.
+   */
+  const REFERENCE_ONLY: readonly number[] = Object.freeze([16, 17]);
+
+  const withCode = new Set<number>();
+  let section = 0;
+
+  for (const line of guide.split('\n')) {
+    const heading = /^## (\d+)\./.exec(line);
+    if (heading !== null) {
+      section = Number(heading[1]);
+      continue;
+    }
+    if (section > 0 && /^```ts\b/.test(line)) withCode.add(section);
+  }
+
+  assert.ok(withCode.size >= 8, `only ${withCode.size} guide sections contain code — the scan is probably broken`);
+
+  const defined = new Set([...tests.matchAll(/test\('guide (\d+):/g)].map((m) => Number(m[1])));
+
+  // Every test number the coverage map names must actually exist, or the map
+  // would paper over a deleted test.
+  for (const [guideSection, testNumbers] of Object.entries(COVERAGE)) {
+    for (const testNumber of testNumbers) {
+      assert.ok(
+        defined.has(testNumber),
+        `COVERAGE maps guide section ${guideSection} to guide test ${testNumber}, which does not exist`,
+      );
+    }
+  }
+
+  const uncovered = [...withCode]
+    .filter((n) => !REFERENCE_ONLY.includes(n))
+    .filter((n) => COVERAGE[n] === undefined)
+    .sort((a, b) => a - b);
+
+  assert.deepEqual(
+    uncovered,
+    [],
+    `these GUIDE.md sections show TypeScript that nothing exercises: ${uncovered.join(', ')}. ` +
+      'Add a test to test/guide.test.ts and map it in COVERAGE, or add the section to REFERENCE_ONLY.',
+  );
+});
+
+test('meta: the quick-reference methods named in the guide exist in the source', () => {
+  // The quick reference is the part of a manual most likely to rot, because it
+  // is a bare list that nothing executes. Two entries were already wrong when
+  // this check was written — `working.reset()` (the method is `clear()`) and
+  // `resolveWhere` attributed to the wrong class.
+  const guide = readFileSync(join(root, 'docs', 'GUIDE.md'), 'utf8');
+  const quickRef = guide.slice(guide.indexOf('## 17. API 速查'));
+  assert.ok(quickRef.length > 500, 'the quick reference section was not found');
+
+  /**
+   * Receiver -> the file whose source must contain the method.
+   *
+   * Deliberately a hand-written map: inferring the receiver-to-class binding
+   * would need a type checker, and a wrong inference would produce a check that
+   * passes for the wrong reason.
+   */
+  const receivers: Readonly<Record<string, string>> = Object.freeze({
+    kernel: 'src/kernel/kernel.ts',
+    'kernel.clock': 'src/kernel/clock.ts',
+    'kernel.bus': 'src/kernel/bus.ts',
+    'kernel.scheduler': 'src/kernel/scheduler.ts',
+    'kernel.rng': 'src/kernel/rng.ts',
+    working: 'src/memory/working.ts',
+    episodic: 'src/memory/episodic.ts',
+    semantic: 'src/memory/semantic.ts',
+    rememberer: 'src/memory/remember.ts',
+    gate: 'src/perception/gate.ts',
+    world: 'src/reasoning/world-model.ts',
+    beliefs: 'src/reasoning/beliefs.ts',
+    goals: 'src/planning/goals.ts',
+    planner: 'src/planning/planner.ts',
+    calibrator: 'src/metacognition/calibration.ts',
+    self: 'src/metacognition/self-model.ts',
+    skills: 'src/skills/registry.ts',
+    agent: 'src/cognition/agent.ts',
+  });
+
+  const missing: string[] = [];
+  let checked = 0;
+
+  for (const [receiver, file] of Object.entries(receivers)) {
+    const source = readFileSync(join(root, file), 'utf8');
+
+    // Find `receiver.method(` occurrences inside the quick-reference block.
+    const pattern = new RegExp(`\\b${receiver.replace('.', '\\.')}\\.([a-zA-Z][\\w]*)\\s*\\(`, 'g');
+    const seen = new Set<string>();
+
+    for (const match of quickRef.matchAll(pattern)) {
+      const method = match[1] as string;
+      if (seen.has(method)) continue;
+      seen.add(method);
+      checked += 1;
+      // `new X(...)` lines name a constructor, not a method on the receiver.
+      if (method === 'constructor') continue;
+      if (!new RegExp(`(?:^|[\\s.])${method}\\s*[(<]`, 'm').test(source)) {
+        missing.push(`${receiver}.${method}() is documented but not found in ${file}`);
+      }
+    }
+  }
+
+  assert.ok(checked > 60, `only ${checked} methods were checked — the quick reference parsing is probably broken`);
+  assert.deepEqual(missing, [], `the guide documents methods that do not exist:\n  ${missing.join('\n  ')}`);
+});

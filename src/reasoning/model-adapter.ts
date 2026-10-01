@@ -545,8 +545,16 @@ export class ModelAdapter {
   async #withTimeout(request: CompletionRequest): Promise<CompletionResponse> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(new Error('model call timed out')), this.#timeoutMs);
-    if (timer.unref !== undefined) timer.unref();
 
+    // NO `unref()` HERE. The timer must keep the event loop alive for as long as
+    // the call it is guarding is outstanding, which is the opposite of what
+    // unref does. With it, a caller whose only pending work is this call — a
+    // plain `await` in a test, for instance — lets the loop drain, and Node
+    // abandons the promise with "Promise resolution is still pending but the
+    // event loop has already resolved". Forty-five tests were cancelled this
+    // way on Node 22 while passing on Node 24, because the newer test runner
+    // happened to keep the loop alive on its own. The timer is cleared in the
+    // `finally` below, so it cannot outlive the call either way.
     try {
       const response = await this.#client.complete({ ...request, signal: controller.signal });
       if (response === null || typeof response !== 'object') {

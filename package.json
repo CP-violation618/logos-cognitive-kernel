@@ -1,7 +1,7 @@
 {
   "name": "logos-cognitive-kernel",
-  "version": "0.1.0",
-  "description": "LOGOS — a zero-dependency cognitive kernel for AGI research. Layered memory, goal-driven autonomy, metacognitive reflection, and predictive world modelling in pure TypeScript.",
+  "version": "0.2.0",
+  "description": "LOGOS — a zero-dependency cognitive kernel for AGI research. Layered memory, scarce attention, revisable belief, hierarchical planning, procedural memory and a self-model, in pure TypeScript.",
   "keywords": [
     "agi",
     "cognitive-architecture",
@@ -10,8 +10,13 @@
     "agent",
     "autonomous-agents",
     "metacognition",
+    "calibration",
     "world-model",
     "memory",
+    "episodic-memory",
+    "semantic-memory",
+    "htn-planner",
+    "zero-dependencies",
     "typescript"
   ],
   "license": "MIT",
@@ -24,9 +29,12 @@
     ".": "./src/index.ts",
     "./kernel": "./src/kernel/index.ts",
     "./memory": "./src/memory/index.ts",
+    "./perception": "./src/perception/index.ts",
     "./reasoning": "./src/reasoning/index.ts",
     "./planning": "./src/planning/index.ts",
-    "./metacognition": "./src/metacognition/index.ts"
+    "./metacognition": "./src/metacognition/index.ts",
+    "./skills": "./src/skills/index.ts",
+    "./cognition": "./src/cognition/index.ts"
   },
   "files": [
     "src",

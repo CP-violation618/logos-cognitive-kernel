@@ -30,13 +30,28 @@ export type Tick = Brand<number, 'Tick'>;
 
 export const tick = (n: number): Tick => n as Tick;
 
-// Identifier factories. Short random suffix keeps ids unique across process
-// restarts and across persisted/replayed sessions without a central counter.
+/**
+ * Identifier factories.
+ *
+ * The suffix is DETERMINISTIC — a monotonic counter, base-36 encoded — and
+ * deliberately not random. An earlier version appended `Math.random()`, which
+ * broke the project's central determinism claim in a way that was easy to miss:
+ * ids never appeared in the demo's printed output, so a same-seed re-run looked
+ * identical while the underlying events, snapshots and belief payloads all
+ * carried different identifiers. A bug report that quotes an id could not have
+ * been reproduced.
+ *
+ * The counter plus the per-kind prefix is unique within a process, which is all
+ * an id has to be. Ids are not persisted across processes in this version; when
+ * persistence arrives it will need a session prefix, and this comment is where
+ * that will be noticed.
+ */
 let idCounter = 0;
 const nextId = (prefix: string): string => {
-  idCounter = (idCounter + 1) % Number.MAX_SAFE_INTEGER;
-  const rand = Math.random().toString(36).slice(2, 8);
-  return `${prefix}_${idCounter.toString(36)}${rand}`;
+  // Wrapping at 2^32 keeps the suffix short and is far beyond any session's
+  // identifier count; a collision would need four billion ids of one kind.
+  idCounter = (idCounter + 1) % 0xffffffff;
+  return `${prefix}_${idCounter.toString(36)}`;
 };
 
 export const newGoalId = (): GoalId => nextId('goal') as GoalId;

@@ -63,8 +63,15 @@ export * from './skills/index.ts';
 // ── The integrated cycle ────────────────────────────────────────────────────
 export * from './cognition/index.ts';
 
-/** Package version, mirrored from package.json for runtime introspection. */
-export const VERSION = '0.1.0';
+/**
+ * Package version, mirrored from package.json for runtime introspection.
+ *
+ * Kept in sync by hand rather than read from the manifest, because reading it
+ * would mean a filesystem access at module load and a dependency on the
+ * package's own layout — neither of which a source-only library should have.
+ * `test/meta.test.ts` asserts the two agree, so the sync cannot silently drift.
+ */
+export const VERSION = '0.2.0';
 
 /**
  * The architecture's layer order, lowest first.

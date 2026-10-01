@@ -10,7 +10,7 @@ Layered memory · scarce attention · revisable belief · hierarchical planning 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.18-339933.svg)](https://nodejs.org)
 [![Dependencies](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](#zero-dependencies)
-[![Tests](https://img.shields.io/badge/tests-729%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-733%20passing-brightgreen.svg)](#testing)
 
 </div>
 
@@ -337,7 +337,7 @@ build step. Type checking still runs under `strict` plus
 ## Testing
 
 ```bash
-node --test "test/**/*.test.ts"   # 729 tests
+node --test "test/**/*.test.ts"   # 733 tests
 npx tsc --noEmit                  # type check
 ```
 
@@ -413,7 +413,7 @@ src/
   cognition/       agent          ← the integrated cycle
   scenarios/       pipeline       ← a worked demonstration
   cli.ts
-test/              729 tests: every layer, the integration, and the project itself
+test/              733 tests: every layer, the integration, and the project itself
 examples/          quickstart.ts  — a runnable tour
 docs/              ARCHITECTURE.md — the long-form design argument
 ```
@@ -449,9 +449,10 @@ docs/              ARCHITECTURE.md — the long-form design argument
 | YAML lint (workflows, since a broken one fails silently) | 7 | ✅ complete |
 | CLI (argument contract, exit codes, output streams) | 15 | ✅ complete |
 | Gate defaults (a percept can actually get in) | 5 | ✅ complete |
+| Calibration grading (claim and criterion must match) | 4 | ✅ complete |
 | Guide (the manual's own examples, executed) | 37 | ✅ complete |
 
-**729 tests total.** Roughly 14,000 lines of source and 9,000 lines of tests — a
+**733 tests total.** Roughly 14,000 lines of source and 9,000 lines of tests — a
 ratio the project is deliberate about, because the tests are the argument rather
 than the paperwork.
 

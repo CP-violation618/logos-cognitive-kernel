@@ -132,6 +132,15 @@ interface AgentState {
    * afterwards from knowledge it did not have at the time.
    */
   pendingConfidence: number;
+  /**
+   * The state the mind said the world would proceed to, so the forecast can be
+   * scored against what actually arrived.
+   *
+   * `undefined` means the mind had nothing to forecast and instead expected the
+   * situation to continue — which is graded differently, because that is a
+   * different claim.
+   */
+  pendingExpected: string | undefined;
 }
 
 export class CognitiveAgent {
@@ -167,6 +176,7 @@ export class CognitiveAgent {
     goalId: undefined,
     pendingPrediction: undefined,
     pendingConfidence: 0,
+    pendingExpected: undefined,
   };
   #cycles: CycleReport[] = [];
   #cycleCount = 0;
@@ -292,6 +302,20 @@ export class CognitiveAgent {
     // nothing to generalise from. An architecture whose memory layer is only
     // ever written by its tests is not remembering anything.
     let surprise = 0;
+    /**
+     * The content of the first admitted observation — the state the world moved
+     * to, used to grade the previous cycle's forecast.
+     *
+     * The FIRST admitted percept rather than the most surprising one: the
+     * forecast names a single successor, and taking the most surprising of
+     * several admitted percepts would mean grading against whichever one
+     * happened to win a race, which is a coin flip dressed as a rule. The
+     * admitted order is deterministic and inspectable, so the first is too.
+     *
+     * When nothing was admitted the world did not move, and the forecast is
+     * graded on surprise instead — see `#registerPrediction`.
+     */
+    const observedContent: string | undefined = admitted[0]?.percept.content;
     for (const decision of admitted) {
       try {
         const outcome = this.#world.observe({ content: decision.percept.content });
@@ -379,7 +403,7 @@ export class CognitiveAgent {
     // prediction so that a LATER cycle can score it. Predicting without
     // recording would make reflection impossible; recording without predicting
     // would make it meaningless.
-    const expected = this.#registerPrediction(admitted.length > 0 ? surprise : 0);
+    const expected = this.#registerPrediction(admitted.length > 0 ? surprise : 0, observedContent);
 
     // ── 8. REFLECT ──
     //
@@ -559,15 +583,31 @@ export class CognitiveAgent {
    * possible: a mind that never wrote down what it expected cannot check
    * whether it was right.
    */
-  #registerPrediction(surprise: number): readonly string[] {
-    // Settle the previous cycle's prediction first, so reflection scores
-    // predictions against real outcomes rather than against nothing. The
-    // outcome is whether the world behaved as the model expected: a surprising
-    // cycle is one where the forecast did not hold.
+  #registerPrediction(surprise: number, observedContent: string | undefined): readonly string[] {
+    // Settle the previous cycle's prediction, graded against WHAT IT CLAIMED.
+    //
+    // This used to be `resolve(pending, surprise < 0.5)` — "was this cycle
+    // unsurprising" — while the confidence attached to the claim came from
+    // `forecast[0].probability`, which is P(the world proceeds to THIS state).
+    // One criterion to claim, another to grade, and the two are barely related:
+    // on the demo's data the surprise test passed ~93% of the time while the
+    // confidence averaged 0.64, so the calibration report described a
+    // forecaster that does not exist and `skill` pinned to its −1 floor.
+    //
+    // A forecast about which state comes next is now scored on whether that
+    // state arrived. When the mind had nothing to forecast it claimed only that
+    // the situation would continue, and THAT is graded by surprise, because
+    // that is what it actually asserted.
     if (this.#state.pendingPrediction !== undefined) {
-      this.#calibrator.resolve(this.#state.pendingPrediction, surprise < 0.5);
+      const expected = this.#state.pendingExpected;
+      const correct =
+        expected === undefined
+          ? surprise < 0.5
+          : observedContent !== undefined && sameState(observedContent, expected);
+      this.#calibrator.resolve(this.#state.pendingPrediction, correct);
       this.#state.pendingPrediction = undefined;
       this.#state.pendingConfidence = 0;
+      this.#state.pendingExpected = undefined;
     }
 
     const forecast = this.#world.predict(2);
@@ -590,6 +630,7 @@ export class CognitiveAgent {
     });
     this.#state.pendingPrediction = prediction.id;
     this.#state.pendingConfidence = confidence;
+    this.#state.pendingExpected = forecast.length === 0 ? undefined : forecast[0]?.content;
 
     return forecast.map((p) => p.content.slice(0, 80));
   }
@@ -708,6 +749,19 @@ const clampUnit = (value: number): number => {
 };
 
 const round = (n: number): number => Math.round(n * 1e6) / 1e6;
+
+/**
+ * Did the world arrive where the forecast said it would?
+ *
+ * Exact on normalised text, because the world model already groups observations
+ * by similarity — a state's `content` IS the label it decided on, so the
+ * forecast names the same string the observation will. Re-matching here with a
+ * second, looser rule would mean two matchers that could disagree, and a
+ * calibration score is only as trustworthy as the agreement it is computed
+ * from.
+ */
+const sameState = (observed: string, expected: string): boolean =>
+  observed.trim().toLowerCase() === expected.trim().toLowerCase();
 
 const describe = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);

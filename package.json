@@ -1,6 +1,6 @@
 {
   "name": "logos-cognitive-kernel",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "LOGOS — a zero-dependency cognitive kernel for AGI research. Layered memory, scarce attention, revisable belief, hierarchical planning, procedural memory and a self-model, in pure TypeScript.",
   "keywords": [
     "agi",

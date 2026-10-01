@@ -19,6 +19,54 @@ additional strategy kinds for the self-model.
 
 ---
 
+## [0.2.2] — 2025-01-02
+
+The release where the project was first run somewhere other than the machine it
+was written on. Publishing found four defects, and every one of them had been
+invisible locally.
+
+### Fixed
+
+- **The claimed minimum Node version was false.** The project said 22.6+ in
+  eight places. Type stripping landed in 22.6.0 *behind*
+  `--experimental-strip-types` and only became the default in **22.18.0**, so
+  the advertised floor could not load a single `.ts` file:
+  `ERR_UNKNOWN_FILE_EXTENSION`. The floor is now 22.18.0 everywhere, and a test
+  checks all eight places against `package.json` so they cannot disagree again.
+
+- **A guard timer was `unref()`'d, cancelling 45 tests on Node 22.** An unref'd
+  timer does not keep the event loop alive — backwards for a timer whose job is
+  to stay pending while the call it guards is outstanding. Node 24's test runner
+  happened to keep the loop alive, so this was invisible on the development
+  machine. Found by running on the exact pinned floor; isolated by an A/B run
+  (`with unref(): pass 7, cancelled 45` / `without: pass 52`).
+
+- **The CI workflow was rejected outright by GitHub.** One step was named
+  `Assert no import resolves outside node: and ./` — unquoted, and containing
+  `: `, which YAML reads as a nested mapping. Every run failed in under a second
+  with nothing more informative than "workflow file issue". The check guarding
+  that file matched *strings* and passed happily on a workflow GitHub would not
+  accept.
+
+- **The `zero-dependencies` job fired on correct code.** Its grep demanded that
+  a quote be immediately followed by a non-dot, so `import type { X } from
+  '../foo.ts'` — space before the quote — was reported as a violation. A check
+  that fires on correct code is worse than no check.
+
+### Added
+
+- A **container** CI job: the image builds, runs the demo, is reproducible from
+  its seed inside the container, contains no `node_modules`, and does not run as
+  root. This was the last deliverable with nothing verifying it.
+- `test/yaml-problems.ts` and its tests — a narrow linter for the YAML mistakes
+  that get a workflow rejected, checked against the original broken line because
+  a test that has never been seen to fail is a test you do not know works.
+- Tests asserting that every minimum-Node claim agrees with the manifest, and
+  that CI tests the exact claimed floor. Pinning the floor rather than using a
+  range is what exposed the Node 22 defect; a range would have drifted past it.
+
+---
+
 ## [0.2.1] — 2025-01-02
 
 Closes the last verification gap. The container image was, until now, the only

@@ -182,16 +182,41 @@ test('tui: the panels that matter are present', async () => {
 });
 
 test('tui: typing an observation runs a cycle and the panels change', async () => {
-  const quiet = await runHarness([]);
   const typed = await runHarness(['the primary database has stopped accepting writes']);
+  const frames = framesOf(typed.writes).map((f) => visible(f));
+  const all = frames.join('\n');
 
-  const lastQuiet = visible(framesOf(quiet.writes).at(-2) as string);
-  const lastTyped = visible(framesOf(typed.writes).at(-2) as string);
+  // Asserted on the CONTENT of the frames rather than on their order or count.
+  // An earlier version compared `frames.at(-2)` between two runs, which is a
+  // frame count rather than a cause: on a slower machine fewer frames are drawn
+  // and that index is simply absent.
+  //
+  // Two short markers rather than the whole state line, because the ATTENTION
+  // panel truncates it to fit — a long pattern would match nothing and look
+  // like a missing feature instead of a clipped label.
+  const cycles = [...all.matchAll(/cycles=(\d+)/g)].map((m) => Number(m[1]));
+  assert.ok(cycles.length > 0, 'the cycle counter was never drawn');
+  assert.ok(Math.max(...cycles) >= 1, `the cycle counter never advanced: saw ${cycles.join(', ')}`);
 
-  assert.notEqual(lastTyped, lastQuiet, 'typing changed nothing on screen');
+  // Working memory must go from empty to holding something. Its panel header
+  // carries the occupancy and is short enough to survive truncation.
+  const occupancy = [...all.matchAll(/(\d+)\/(\d+) slots/g)].map((m) => `${m[1]}/${m[2]}`);
+  assert.ok(occupancy.length > 0, 'the working-memory panel header was never drawn');
   assert.ok(
-    /surprise|admitted|refused/i.test(lastTyped),
-    'no feedback about what happened to the observation',
+    occupancy.some((o) => !o.startsWith('0/')),
+    `working memory never took anything in; occupancy seen: ${[...new Set(occupancy)].join(', ')}`,
+  );
+
+  // And the dashboard reported what happened, at some point.
+  //
+  // The two surfaces word this differently — the dashboard says
+  // `admitted · surprise 0.00` and the REPL says `admitted 1/1` — so the
+  // pattern accepts either. Requiring one exact phrasing would make the test
+  // fail on a cosmetic change while the behaviour was intact.
+  assert.match(
+    all,
+    /admitted(?: \d+\/\d+)? ·|refused \(|refused \(/,
+    `the dashboard never said what happened to the observation:\n${all.slice(-500)}`,
   );
 });
 
@@ -202,7 +227,7 @@ test('tui: a refusal is reported rather than silently swallowed', async () => {
   const { writes } = await runHarness(['heartbeat ok', 'heartbeat ok', 'heartbeat ok']);
   const text = writes.map((w) => visible(w)).join('\n');
   assert.ok(
-    /refused|admitted/i.test(text),
+    /admitted \d+\/\d+|refused/i.test(text),
     'the dashboard never reported what happened to the input',
   );
 });

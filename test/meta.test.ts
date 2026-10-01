@@ -72,6 +72,70 @@ test('meta: the source version matches the manifest', () => {
   );
 });
 
+test('meta: every minimum-Node claim agrees with the manifest', () => {
+  // The floor was claimed as "22.6+" in the README, the Dockerfile, the CLI's
+  // own help text, the issue template and four other places — and it was FALSE.
+  // Type stripping landed in 22.6.0 behind `--experimental-strip-types` and
+  // only became the default in 22.18.0, so every one of those claims was wrong
+  // in the same direction. CI found it by testing the exact pinned floor.
+  //
+  // A version claim is the easiest kind of documentation to get wrong, because
+  // nothing in the code depends on it — so it is now checked against the single
+  // place that DOES have to be right for `npm install` to behave.
+  const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
+    engines?: { node?: string };
+  };
+  const declared = /^>=(\d+\.\d+\.\d+)$/.exec(manifest.engines?.node ?? '')?.[1];
+
+  assert.ok(
+    declared !== undefined,
+    `package.json engines.node must be an exact floor like ">=22.18.0", got "${String(manifest.engines?.node)}"`,
+  );
+
+  const [major, minor] = declared.split('.').map(Number) as [number, number];
+  const claimed = `${major}.${minor}`;
+
+  /** Files that state the floor to a human, and the pattern they state it with. */
+  const claims: readonly { readonly file: string; readonly pattern: RegExp }[] = [
+    { file: 'README.md', pattern: /node-%3E%3D(\d+\.\d+)/ },
+    { file: 'README.md', pattern: /Node \*\*(\d+\.\d+\.\d+)\*\* or later/ },
+    { file: 'CONTRIBUTING.md', pattern: /Node (\d+\.\d+)\+ strips/ },
+    { file: 'Dockerfile', pattern: /# Node (\d+\.\d+)\+ is required/ },
+    { file: 'src/cli.ts', pattern: /Node (\d+\.\d+)\+ strips types/ },
+    { file: 'src/cli.ts', pattern: /Runs on Node (\d+\.\d+)\+ with no dependencies/ },
+    { file: '.github/ISSUE_TEMPLATE/bug_report.yml', pattern: /The floor is (\d+\.\d+)/ },
+  ];
+
+  for (const { file, pattern } of claims) {
+    const text = readFileSync(join(root, file), 'utf8');
+    const found = pattern.exec(text)?.[1];
+    assert.ok(found !== undefined, `${file} no longer states a Node floor matching ${String(pattern)} — update this list`);
+    assert.ok(
+      found === claimed || found === declared,
+      `${file} claims Node ${found} but package.json requires >=${declared}. ` +
+        'Every one of these has to agree, or the project tells different people different things.',
+    );
+  }
+});
+
+test('meta: the CI matrix tests the exact floor the manifest claims', () => {
+  const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
+    engines?: { node?: string };
+  };
+  const floor = /^>=(.+)$/.exec(manifest.engines?.node ?? '')?.[1];
+  const workflow = readFileSync(join(root, '.github', 'workflows', 'ci.yml'), 'utf8');
+
+  // Pinning the exact floor is the point. A range like "22.x" drifts upward as
+  // releases land and would eventually stop testing the version the project
+  // says it supports — which is precisely how the 22.6 claim survived as long
+  // as it did.
+  assert.ok(
+    workflow.includes(`'${String(floor)}'`),
+    `CI does not test the claimed floor (${String(floor)}). ` +
+      'A minimum version that nothing runs against is a guess, not a claim.',
+  );
+});
+
 // ── The layer list describes reality ────────────────────────────────────────
 
 test('meta: every declared layer has a directory', () => {

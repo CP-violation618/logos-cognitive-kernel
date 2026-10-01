@@ -24,9 +24,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 22.6 is the floor: it is the first release with native TypeScript type
-        # stripping, which this project depends on to run .ts files directly.
-        node: ['22.6', '22.x', '24.x']
+        # 22.18.0 IS THE FLOOR, and the exact pin matters.
+        #
+        # Type stripping landed in 22.6.0 but BEHIND `--experimental-strip-types`.
+        # It became the default in 22.18.0. The previous matrix tested 22.6 and
+        # 22.x, which failed with `ERR_UNKNOWN_FILE_EXTENSION: Unknown file
+        # extension ".ts"` — proving that an earlier README claim ("Node 22.6+")
+        # was simply false. Testing the exact claimed floor is what caught it, so
+        # the pin stays exact rather than becoming a range that would drift away
+        # from the claim.
+        node: ['22.18.0', '24.x']
         os: [ubuntu-latest]
         include:
           # One Windows and one macOS run, to catch path and line-ending bugs
@@ -152,16 +159,47 @@ jobs:
             console.log("dev:     " + dev.length + " (" + dev.join(", ") + ")");
           '
 
-      - name: 'Assert no import resolves outside node: and ./'
+      - name: Assert no import creates a dependency
         shell: bash
         run: |
-          # Every import in src/ must be a relative path or a node: builtin.
-          # An accidental bare specifier would be a dependency the badge lies about.
-          if grep -rEn "from ['\"][^./]" src --include='*.ts' | grep -v "from 'node:"; then
-            echo "::error::a non-relative, non-builtin import was found in src/"
-            exit 1
-          fi
-          echo "every src/ import is relative or a node: builtin"
+          # Every import in src/ must be a relative path or a node: builtin. An
+          # accidental bare specifier would be a dependency the badge lies about.
+          #
+          # Done in Node rather than grep, because the previous grep was wrong:
+          # `from ['"][^./]` demands that the quote be immediately followed by a
+          # non-dot, so `import type { X } from '../foo.ts'` — which has a SPACE
+          # before the quote — was reported as a violation. A check that fires on
+          # correct code is worse than no check, because it teaches people to
+          # ignore it.
+          #
+          # Comments are stripped first so that prose quoting an import is not
+          # mistaken for one.
+          node -e '
+            const fs = require("fs"), path = require("path");
+            const offenders = [];
+            const walk = (dir) => {
+              for (const entry of fs.readdirSync(dir)) {
+                const full = path.join(dir, entry);
+                if (fs.statSync(full).isDirectory()) { walk(full); continue; }
+                if (!entry.endsWith(".ts")) continue;
+                const text = fs.readFileSync(full, "utf8")
+                  .replace(/\/\*[\s\S]*?\*\//g, "")
+                  .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+                for (const m of text.matchAll(/^\s*(?:import|export)\s[^\n]*?from\s+["\x27]([^"\x27]+)["\x27]/gm)) {
+                  const s = m[1];
+                  if (s.startsWith(".") || s.startsWith("node:")) continue;
+                  offenders.push(full + " imports \"" + s + "\"");
+                }
+              }
+            };
+            walk("src");
+            if (offenders.length > 0) {
+              console.error("::error::non-relative, non-builtin imports found:");
+              for (const o of offenders) console.error("  " + o);
+              process.exit(1);
+            }
+            console.log("every src/ import is relative or a node: builtin");
+          '
 
   container:
     name: Container

@@ -16,7 +16,7 @@
  *
  * Implemented with `node:util` parseArgs and no dependencies, in keeping with
  * the rest of the project. It runs directly from TypeScript source because
- * Node 22.6+ strips types natively.
+ * Node 22.18+ strips types natively.
  */
 
 import { parseArgs } from 'node:util';
@@ -60,7 +60,7 @@ Examples:
   logos bench --cycles 500
   logos inspect --json
 
-Runs on Node 22.6+ with no dependencies.
+Runs on Node 22.18+ with no dependencies.
 `;
 
 /** Parse a seed that may be decimal or hexadecimal. */

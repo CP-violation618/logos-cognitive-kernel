@@ -32,7 +32,7 @@ npm install --include=dev
 npm run verify
 ```
 
-No build step. Node 22.6+ strips TypeScript types natively, so the source is the
+No build step. Node 22.18+ strips TypeScript types natively, so the source is the
 artifact. `npm run verify` runs the type check, the tests, and the example.
 
 > **If `npm install` says "up to date" and installs nothing**, your npm is

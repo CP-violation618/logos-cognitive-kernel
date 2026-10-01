@@ -22,7 +22,7 @@ body:
     id: node
     attributes:
       label: Node version
-      description: The output of `node --version`. The floor is 22.6.
+      description: The output of `node --version`. The floor is 22.18.
       placeholder: 'v24.16.0'
     validations:
       required: true

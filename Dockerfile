@@ -1,6 +1,6 @@
 # LOGOS — container image
 # ============================================================================
-# Node 22.6+ is required: it is the first release with native TypeScript type
+# Node 22.18+ is required: it is the first release with native TypeScript type
 # stripping, which is how this project runs .ts files with no build step.
 #
 # THE IMAGE IS DELIBERATELY MINIMAL. It installs nothing at run time, because

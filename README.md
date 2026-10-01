@@ -8,9 +8,9 @@ Layered memory · scarce attention · revisable belief · hierarchical planning 
 
 [![CI](https://github.com/CP-violation618/logos-cognitive-kernel/actions/workflows/ci.yml/badge.svg)](https://github.com/CP-violation618/logos-cognitive-kernel/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Node](https://img.shields.io/badge/node-%3E%3D22.6-339933.svg)](https://nodejs.org)
+[![Node](https://img.shields.io/badge/node-%3E%3D22.18-339933.svg)](https://nodejs.org)
 [![Dependencies](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](#zero-dependencies)
-[![Tests](https://img.shields.io/badge/tests-660%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-670%20passing-brightgreen.svg)](#testing)
 
 </div>
 
@@ -63,7 +63,7 @@ cd logos-cognitive-kernel
 node src/cli.ts demo
 ```
 
-No install step. Node 22.6+ strips TypeScript types natively, so the source
+No install step. Node 22.18+ strips TypeScript types natively, so the source
 *is* the artifact.
 
 ```
@@ -337,7 +337,7 @@ build step. Type checking still runs under `strict` plus
 ## Testing
 
 ```bash
-node --test "test/**/*.test.ts"   # 660 tests
+node --test "test/**/*.test.ts"   # 670 tests
 npx tsc --noEmit                  # type check
 ```
 
@@ -378,7 +378,7 @@ Five jobs, and three of them exist to enforce claims rather than to check code:
 
 | Job | What it does |
 |---|---|
-| **test** | Node 22.6, 22.x and 24.x on Linux, plus one Windows and one macOS run. `--include=dev` regardless of local npm config, because a machine with `omit=dev` would otherwise install nothing and silently skip the type check. |
+| **test** | Node 22.18 (the claimed floor) and 24.x on Linux, plus one Windows and one macOS run. `--include=dev` regardless of local npm config, because a machine with `omit=dev` would otherwise install nothing and silently skip the type check. |
 | **determinism** | The demo must be reproducible from its seed, **and different seeds must diverge** — a same-seed check alone passes trivially when nothing varies. |
 | **example** | The quickstart and every documented CLI command must actually run. |
 | **zero-dependencies** | `package.json` declares no runtime dependencies, and no import in `src/` resolves outside `node:` and relative paths. |
@@ -413,7 +413,7 @@ src/
   cognition/       agent          ← the integrated cycle
   scenarios/       pipeline       ← a worked demonstration
   cli.ts
-test/              660 tests: every layer, the integration, and the project itself
+test/              670 tests: every layer, the integration, and the project itself
 examples/          quickstart.ts  — a runnable tour
 docs/              ARCHITECTURE.md — the long-form design argument
 ```
@@ -439,9 +439,10 @@ docs/              ARCHITECTURE.md — the long-form design argument
 | Skills (procedural memory · practice · automatization) | 50 | ✅ complete |
 | Cognition (integrated cycle) | 31 | ✅ complete |
 | Integration (perception ↔ world model) | 9 | ✅ complete |
-| Meta (the project's own claims, checked) | 22 | ✅ complete |
+| Meta (the project's own claims, checked) | 25 | ✅ complete |
+| YAML lint (workflows, since a broken one fails silently) | 7 | ✅ complete |
 
-**660 tests total.** Roughly 14,000 lines of source and 9,000 lines of tests — a
+**670 tests total.** Roughly 14,000 lines of source and 9,000 lines of tests — a
 ratio the project is deliberate about, because the tests are the argument rather
 than the paperwork.
 
@@ -456,7 +457,7 @@ could have caught.
 
 ## Requirements
 
-Node **22.6.0** or later. Nothing else.
+Node **22.18.0** or later. Nothing else.
 
 > **Note for contributors:** if `npm install` reports "up to date" and installs
 > nothing, your npm is configured with `omit=dev`. Use

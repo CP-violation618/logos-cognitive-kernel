@@ -389,10 +389,61 @@ test('meta: the required top-level documents exist', () => {
   }
 });
 
-test('meta: the CI workflow exists and enforces determinism', () => {
+test('meta: the CI workflow exists and enforces every claim the project makes', () => {
   const workflow = readFileSync(join(root, '.github', 'workflows', 'ci.yml'), 'utf8');
+
   // The determinism claim is the one most likely to rot silently, because
   // nothing about adding a feature reminds you that replay was a promise.
-  assert.match(workflow, /Different seeds must diverge/);
-  assert.match(workflow, /zero-dependencies/);
+  assert.match(workflow, /Different seeds must diverge/, 'CI no longer checks that different seeds diverge');
+  assert.match(workflow, /zero-dependencies/, 'CI no longer checks the dependency claim');
+
+  // The container job exists because the image was, for a while, the only
+  // deliverable with no check behind it at all — and a Dockerfile nothing
+  // builds is a Dockerfile that stops working the first time a path changes.
+  assert.match(workflow, /docker build/, 'CI no longer builds the container image');
+  assert.match(workflow, /does not run as root/, 'CI no longer checks the container user');
+  assert.match(workflow, /no installed dependencies/, 'CI no longer checks that the image has no node_modules');
+});
+
+test('meta: the Dockerfile installs nothing at run time', () => {
+  // The image is the clearest statement of the zero-dependency claim: what
+  // ships is the runtime plus the source, and an `npm install` in it would mean
+  // something was added that the project says it does not have.
+  const dockerfile = readFileSync(join(root, 'Dockerfile'), 'utf8');
+  const installLines = dockerfile
+    .split('\n')
+    .filter((line) => /^\s*RUN\s/.test(line) && /\bnpm\s+(?:install|ci)\b/.test(line));
+
+  assert.deepEqual(
+    installLines,
+    [],
+    `the Dockerfile installs packages at build time:\n  ${installLines.join('\n  ')}`,
+  );
+});
+
+test('meta: the Dockerfile runs as a non-root user', () => {
+  const dockerfile = readFileSync(join(root, 'Dockerfile'), 'utf8');
+  assert.match(dockerfile, /^USER (?!root)\w+/m, 'the Dockerfile does not drop to a non-root user');
+});
+
+test('meta: every path the Dockerfile copies exists in the repository', () => {
+  const dockerfile = readFileSync(join(root, 'Dockerfile'), 'utf8');
+  const copied: string[] = [];
+
+  for (const line of dockerfile.split('\n')) {
+    const match = /^\s*COPY\s+(?:--\S+\s+)*(.+?)\s+\S+\s*$/.exec(line);
+    if (match === null) continue;
+    for (const source of (match[1] as string).split(/\s+/)) {
+      if (source === '--from') continue;
+      copied.push(source);
+    }
+  }
+
+  assert.ok(copied.length > 0, 'the Dockerfile copies nothing, so it cannot build anything');
+  for (const source of copied) {
+    assert.doesNotThrow(
+      () => statSync(join(root, source)),
+      `the Dockerfile copies "${source}", which does not exist — the image would fail to build`,
+    );
+  }
 });

@@ -71,7 +71,7 @@ export * from './cognition/index.ts';
  * package's own layout — neither of which a source-only library should have.
  * `test/meta.test.ts` asserts the two agree, so the sync cannot silently drift.
  */
-export const VERSION = '0.2.0';
+export const VERSION = '0.2.1';
 
 /**
  * The architecture's layer order, lowest first.

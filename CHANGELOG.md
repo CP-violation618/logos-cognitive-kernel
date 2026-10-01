@@ -19,6 +19,38 @@ additional strategy kinds for the self-model.
 
 ---
 
+## [0.2.1] — 2025-01-02
+
+Closes the last verification gap. The container image was, until now, the only
+deliverable with nothing checking it, and it had already accumulated a real
+problem as a result.
+
+### Changed
+
+- **The image no longer runs `npm install`.** The previous Dockerfile installed
+  the dev dependencies at build time — unnecessary, since they exist to VERIFY
+  the source rather than to execute it — and it made the image's contents a lie
+  about what the project depends on. What ships is now the Node runtime and the
+  source, and nothing else.
+- CI gained a **container** job: the image must build, run the demo, be
+  deterministic inside the container, contain no `node_modules`, and not run as
+  root.
+
+### Fixed
+
+- The `COPY` list omitted three documents the repository has (`CHANGELOG.md`,
+  `CONTRIBUTING.md`, `SECURITY.md`). A path the Dockerfile names but the
+  repository does not contain is a build failure waiting for the next rename, so
+  a test now checks every `COPY` source against the working tree.
+
+### Added
+
+- Four checks on the image, in `test/meta.test.ts`: it installs nothing at run
+  time, it drops to a non-root user, every path it copies exists, and CI still
+  builds it.
+
+---
+
 ## [0.2.0] — 2025-01-02
 
 Adds the two layers that complete the architecture: procedural memory (what the

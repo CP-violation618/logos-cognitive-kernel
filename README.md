@@ -10,7 +10,7 @@ Layered memory · scarce attention · revisable belief · hierarchical planning 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.6-339933.svg)](https://nodejs.org)
 [![Dependencies](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](#zero-dependencies)
-[![Tests](https://img.shields.io/badge/tests-638%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-660%20passing-brightgreen.svg)](#testing)
 
 </div>
 
@@ -337,7 +337,7 @@ build step. Type checking still runs under `strict` plus
 ## Testing
 
 ```bash
-node --test "test/**/*.test.ts"   # 638 tests
+node --test "test/**/*.test.ts"   # 660 tests
 npx tsc --noEmit                  # type check
 ```
 
@@ -364,6 +364,30 @@ because they were "obviously right" arithmetic:
   base rate" gives `p(1-p)`, so the doubling reported a skill of **0.5** for a
   forecaster with no skill at all.
 
+There is also a category of test that checks the **project** rather than its
+behaviour — that the version in the source matches the manifest, that no import
+could create a dependency the badge denies, that the Dockerfile installs nothing
+and runs as a non-root user, that CI still enforces determinism. Writing that
+file immediately found a real defect: identifier generation used `Math.random`,
+which broke the determinism claim in a way no behaviour test could have caught,
+because ids never appeared in any output a test looked at.
+
+### Continuous integration
+
+Five jobs, and three of them exist to enforce claims rather than to check code:
+
+| Job | What it does |
+|---|---|
+| **test** | Node 22.6, 22.x and 24.x on Linux, plus one Windows and one macOS run. `--include=dev` regardless of local npm config, because a machine with `omit=dev` would otherwise install nothing and silently skip the type check. |
+| **determinism** | The demo must be reproducible from its seed, **and different seeds must diverge** — a same-seed check alone passes trivially when nothing varies. |
+| **example** | The quickstart and every documented CLI command must actually run. |
+| **zero-dependencies** | `package.json` declares no runtime dependencies, and no import in `src/` resolves outside `node:` and relative paths. |
+| **container** | The image builds, runs the demo, is deterministic inside the container, contains no `node_modules`, and does not run as root. |
+
+The container job was added late, because the image was for a while the only
+deliverable with nothing verifying it — and a Dockerfile that nothing builds is
+a Dockerfile that stops working the first time somebody renames a directory.
+
 ## Determinism
 
 Everything is seeded and reproducible. The same inputs produce the same mental
@@ -389,7 +413,7 @@ src/
   cognition/       agent          ← the integrated cycle
   scenarios/       pipeline       ← a worked demonstration
   cli.ts
-test/              638 tests across every layer, plus integration
+test/              660 tests: every layer, the integration, and the project itself
 examples/          quickstart.ts  — a runnable tour
 docs/              ARCHITECTURE.md — the long-form design argument
 ```
@@ -409,15 +433,26 @@ docs/              ARCHITECTURE.md — the long-form design argument
 | Kernel (clock · bus · scheduler · rng · config) | 52 | ✅ complete |
 | Memory (working · episodic · semantic · consolidation · recall) | 184 | ✅ complete |
 | Perception (salience · habituation · load adaptation) | 34 | ✅ complete |
-| Reasoning (world model · Bayesian beliefs) | 84 | ✅ complete |
+| Reasoning (world model · Bayesian beliefs · model adapter) | 136 | ✅ complete |
 | Planning (goals · HTN planner) | 64 | ✅ complete |
-| Metacognition (calibration · bias correction · self-model) | 78 | ✅ complete |
+| Metacognition (calibration · self-model · strategy selection) | 78 | ✅ complete |
 | Skills (procedural memory · practice · automatization) | 50 | ✅ complete |
-| Model adapter (containment · schema validation · confidence scoring) | 52 | ✅ complete |
 | Cognition (integrated cycle) | 31 | ✅ complete |
 | Integration (perception ↔ world model) | 9 | ✅ complete |
+| Meta (the project's own claims, checked) | 22 | ✅ complete |
 
-**638 tests total.** Roughly 13,000 lines of source and 8,000 lines of tests — a ratio the project is deliberate about, because the tests are the argument rather than the paperwork.
+**660 tests total.** Roughly 14,000 lines of source and 9,000 lines of tests — a
+ratio the project is deliberate about, because the tests are the argument rather
+than the paperwork.
+
+The last row is worth explaining. Those 22 tests check the *project* rather than
+its behaviour: that the version in the source matches the manifest, that every
+declared layer exists and is reachable, that no import could create a dependency
+the badge denies, that no source file uses `Math.random`, that the Dockerfile
+installs nothing and runs as a non-root user, and that CI still enforces all of
+it. Writing that file immediately found a real defect — identifier generation was
+using `Math.random`, which broke the determinism claim in a way no behaviour test
+could have caught.
 
 ## Requirements
 

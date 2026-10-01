@@ -162,3 +162,65 @@ jobs:
             exit 1
           fi
           echo "every src/ import is relative or a node: builtin"
+
+  container:
+    name: Container
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # A Dockerfile that nothing builds is a Dockerfile that stops working the
+      # first time somebody renames a directory. This job is the only thing that
+      # verifies the image, and it was added because the image was the one
+      # deliverable with no check behind it at all.
+      - name: Build the image
+        run: docker build -t logos:ci .
+
+      - name: The image runs the worked scenario
+        run: |
+          docker run --rm logos:ci demo --quiet > /tmp/container-demo.txt
+          if ! grep -q "cycles" /tmp/container-demo.txt; then
+            echo "::error::the demo produced no summary inside the container"
+            cat /tmp/container-demo.txt
+            exit 1
+          fi
+          tail -4 /tmp/container-demo.txt
+
+      - name: The image runs every documented command
+        run: |
+          docker run --rm logos:ci help > /dev/null
+          docker run --rm logos:ci inspect > /dev/null
+          docker run --rm logos:ci inspect --json | node -e "JSON.parse(require('fs').readFileSync(0,'utf8'))"
+          docker run --rm logos:ci bench --cycles 50 > /dev/null
+          echo "all commands responded inside the container"
+
+      - name: The container is deterministic too
+        run: |
+          docker run --rm logos:ci demo --seed 1234 --quiet > /tmp/c-a.txt
+          docker run --rm logos:ci demo --seed 1234 --quiet > /tmp/c-b.txt
+          if ! diff -q /tmp/c-a.txt /tmp/c-b.txt > /dev/null; then
+            echo "::error::the container is not reproducible from its seed"
+            diff /tmp/c-a.txt /tmp/c-b.txt || true
+            exit 1
+          fi
+          echo "same seed, identical trajectory inside the container"
+
+      - name: The image carries no installed dependencies
+        run: |
+          # The image deliberately runs `npm install` never. If node_modules ever
+          # appears in it, something was added that the project claims not to have.
+          if docker run --rm --entrypoint sh logos:ci -c 'test -d /logos/node_modules'; then
+            echo "::error::the image contains node_modules, but the kernel has no runtime dependencies"
+            exit 1
+          fi
+          echo "no node_modules in the image, as claimed"
+
+      - name: The image does not run as root
+        run: |
+          whoami_in_container=$(docker run --rm --entrypoint sh logos:ci -c 'id -un')
+          echo "container user: $whoami_in_container"
+          if [ "$whoami_in_container" = "root" ]; then
+            echo "::error::the container runs as root"
+            exit 1
+          fi
